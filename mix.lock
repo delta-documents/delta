@@ -1,0 +1,5 @@
+%{
+  "nimble_parsec": {:hex, :nimble_parsec, "1.2.3", "244836e6e3f1200c7f30cb56733fd808744eca61fd182f731eac4af635cc6d0b", [:mix], [], "hexpm", "c8d789e39b9131acf7b99291e93dae60ab48ef14a7ee9d58c6964f59efb570b0"},
+  "pathex": {:hex, :pathex, "2.1.0", "d59eb1f8738b67952f5ca2daeb5f60823e9eaf09839049b33b5ee8bcb3cf3fd4", [:mix], [], "hexpm", "ac9f7eae2f24559cd345ea4032b77a673619d8a2f656a1a79b145cbc41b11c46"},
+  "uuid": {:hex, :uuid, "1.1.8", "e22fc04499de0de3ed1116b770c7737779f226ceefa0badb3592e64d5cfb4eb9", [:mix], [], "hexpm", "c790593b4c3b601f5dc2378baae7efaf5b3d73c4c6456ba85759905be792f2ac"},
+}
