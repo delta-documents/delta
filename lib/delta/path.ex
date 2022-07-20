@@ -28,15 +28,33 @@ defmodule Delta.Path do
 
         {:ok, p}
 
-      {:error, msg, _, _, _} -> {:error, msg}
+      {:error, msg, _, _, _, _} -> {:error, msg}
     end
+  end
+
+  # TODO raise actual exception, not matching error
+
+  @doc """
+  Same as `parse/1`, but raises an exception
+  """
+  def parse!(str) do
+    {:ok, p} = parse(str)
+
+    p
+  end
+
+  @doc """
+  Sigil version of `parse!/1`
+  """
+  def sigil_p(str, _) do
+    parse!(str)
   end
 
   root = ignore(string("$"))
 
-  dot_notation = ignore(string(".")) |> utf8_string([?A..?z, ?0..?9, not: ?\.], min: 1)
+  dot_notation = ignore(string(".")) |> utf8_string([?A..?z, ?0..?9, not: ?\., not: ?\[], min: 1)
 
-  key = ignore(string("'")) |> utf8_string([?A..?z, ?0..?9, not: ?\'], min: 1) |> ignore(string("'"))
+  key = ignore(string("'")) |> utf8_string([not: ?\'], min: 1) |> ignore(string("'"))
   index = utf8_string([?0..?9], min: 1) |> post_traverse({:int, []})
 
   bracket_notation = ignore(string("[")) |> choice([index, key]) |> ignore(string("]"))
@@ -44,7 +62,7 @@ defmodule Delta.Path do
 
   defparsecp :do_parse, optional(root) |> choice([
    eos(),
-   times(child, min: 1)
+   times(child, min: 1) |> eos()
   ]), inline: true
 
   defp int(rest, args, context, _line, _offset) do
