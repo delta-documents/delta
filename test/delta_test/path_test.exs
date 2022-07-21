@@ -22,14 +22,14 @@ defmodule DeltaTest.PathTest do
     {:ok, path1} = parse("$.A")
     {:ok, path2} = parse(".A")
 
-    assert Pathex.inspect(path1) == Pathex.inspect(path2)
+    assert path1 == path2
   end
 
   test "Delta.Path.parse/1 does not make difference of .child and ['child']" do
     {:ok, path1} = parse(".a")
     {:ok, path2} = parse("['a']")
 
-    assert Pathex.inspect(path1) == Pathex.inspect(path2)
+    assert path1 == path2
   end
 
   test "Delta.Path.parse/1 return correct Pathex path" do
@@ -38,9 +38,9 @@ defmodule DeltaTest.PathTest do
     {:ok, path3} = parse(".a.b")
     {:ok, path4} = parse(".a.b[1]")
 
-    assert Pathex.inspect(path1) == ~S/matching(_)/
-    assert Pathex.inspect(path2) == ~S/path("a")/
-    assert Pathex.inspect(path3) == ~S/path("b") ~> path("a")/
-    assert Pathex.inspect(path4) == ~S/path(1) ~> (path("b") ~> path("a"))/
+    assert path1 == []
+    assert path2 == ["a"]
+    assert path3 == ["a", "b"]
+    assert path4 == ["a", "b", 1]
   end
 end
