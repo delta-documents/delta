@@ -8,7 +8,7 @@ defmodule Delta.Storage.MnesiaHelper do
           :mnesia.foldl(
             fn r, acc -> fun.(unquote(struct).from_record(r), acc) end,
             acc0,
-            __MODULE__
+            unquote(struct)
           )
         end
 
@@ -16,15 +16,15 @@ defmodule Delta.Storage.MnesiaHelper do
           :mnesia.foldr(
             fn r, acc -> fun.(unquote(struct).from_record(r), acc) end,
             acc0,
-            __MODULE__
+            unquote(struct)
           )
         end
 
         def get(%unquote(struct){id: id}), do: get(id)
 
         def get(id) do
-          [r] = :mnesia.read(unquote(struct), id)
-          unquote(struct).from_record(r)
+          :mnesia.read(unquote(struct), id)
+          |> Enum.map(&unquote(struct).from_record(&1))
         end
 
         def write(%unquote(struct){} = m) do
