@@ -4,7 +4,7 @@ defmodule Delta.Storage do
 
   deftable(Collection, [:id, :name])
   deftable(Document, [:id, :collection_id, :latest_change_id, :data])
-  deftable(Change, [:id, :document_id, :previous_change_id, :change])
+  deftable(Change, [:id, :document_id, :previous_change_id, :kind, :path, :compiled_path, :value, :meta])
 
   def migrate(nodes \\ [node()]) do
     :rpc.multicall(nodes, Application, :stop, [:mnesia])
@@ -26,8 +26,8 @@ defmodule Delta.Storage do
     )
 
     :mnesia.create_table(Delta.Storage.Change,
-      attributes: [:id, :document_id, :previous_change_id, :change],
-      index: [:document_id, :previous_change_id],
+      attributes:  [:id, :document_id, :previous_change_id, :kind, :path, :compiled_path, :value, :meta],
+      index: [:document_id, :previous_change_id, :kind, :path],
       disc_copies: nodes
     )
   end
