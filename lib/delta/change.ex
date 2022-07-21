@@ -55,4 +55,13 @@ defmodule Delta.Change do
        }}
     end
   end
+
+  def maybe_change_id(nil), do: [nil]
+
+  def maybe_change_id(id) do
+    case MnesiaHelper.get(id) do
+      [%{id: id}] -> [id]
+      x -> x
+    end
+  end
 end
