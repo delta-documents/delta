@@ -35,6 +35,10 @@ defmodule Delta.Storage.MnesiaHelper do
           :mnesia.delete({unquote(struct), id})
         end
 
+        def delete(id) do
+          :mnesia.delete({unquote(struct), id})
+        end
+
         defoverridable(list: 0, foldl: 2, foldr: 2, get: 1, write: 1, delete: 1)
       end
     end

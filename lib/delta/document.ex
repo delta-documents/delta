@@ -27,7 +27,8 @@ defmodule Delta.Document do
   def list(collection: cid) do
     :mnesia.transaction fn ->
       with {:collection, [^cid]} <- {:collection, Delta.Collection.collection_id(cid)} do
-        :mnesia.match_object(__MODULE__, {:_, cid, :_, :_}, :read)
+        :mnesia.index_read(__MODULE__, cid, 2) # Erlang index is 1-based
+        |> Enum.map(&from_record/1)
       else
         {:collection, []} -> :mnesia.abort("#{inspect(Delta.Collection)} with id = #{cid} does not exists")
       end
@@ -79,9 +80,22 @@ defmodule Delta.Document do
   def update(m, attrs), do: update(struct(m, attrs))
 
   def delete(m) do
-    :mnesia.transaction(fn ->
-      MnesiaHelper.delete(m)
-    end)
+    :mnesia.transaction(fn -> do_delete(m) end)
   end
 
+  def do_delete(m) do
+    with [id] <- document_id(m) do
+      :mnesia.index_read(Delta.Change, id, 2) # Erlang index is 1-based
+      |> Enum.map(&Delta.Change.do_delete(elem(&1, 1)))
+
+      MnesiaHelper.delete(m)
+    end
+  end
+
+  def document_id(id) do
+    case MnesiaHelper.get(id) do
+      [%{id: id}] -> [id]
+      x -> x
+    end
+  end
 end

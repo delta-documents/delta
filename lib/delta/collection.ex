@@ -58,9 +58,16 @@ defmodule Delta.Collection do
   def update(m, attrs), do: update(struct(m, attrs))
 
   def delete(m) do
-    :mnesia.transaction(fn ->
+    :mnesia.transaction(fn -> do_delete(m) end)
+  end
+
+  def do_delete(m) do
+    with [id] <- collection_id(m) do
+      :mnesia.index_read(Delta.Document, id, 2) # Erlang index is 1-based
+      |> Enum.map(&Delta.Document.do_delete(elem(&1, 1)))
+
       MnesiaHelper.delete(m)
-    end)
+    end
   end
 
   def collection_id(id) do
