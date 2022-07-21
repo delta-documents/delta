@@ -61,13 +61,14 @@ defmodule Delta.Collection do
     :mnesia.transaction(fn -> do_delete(m) end)
   end
 
-  def do_delete(m) do
-    with [id] <- collection_id(m) do
-      :mnesia.index_read(Delta.Document, id, 2) # Erlang index is 1-based
-      |> Enum.map(&Delta.Document.do_delete(elem(&1, 1)))
+  def do_delete(%__MODULE__{id: id}), do: do_delete(id)
 
-      MnesiaHelper.delete(m)
-    end
+  def do_delete(id) do
+    # Erlang index is 1-based
+    :mnesia.index_read(Delta.Document, id, 2)
+    |> Enum.map(&Delta.Document.do_delete(elem(&1, 1)))
+
+    MnesiaHelper.delete(id)
   end
 
   def collection_id(id) do

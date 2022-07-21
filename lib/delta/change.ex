@@ -9,7 +9,6 @@ defmodule Delta.Change do
         id2 \\ nil,
         kind \\ :update,
         p1 \\ [],
-        p2 \\ nil,
         v \\ nil,
         m \\ nil
       ) do
@@ -51,9 +50,71 @@ defmodule Delta.Change do
     end
   end
 
-  def maybe_change_id(nil), do: [nil]
+  def list do
+    :mnesia.transaction(fn -> MnesiaHelper.list() end)
+  end
 
-  def maybe_change_id(id) do
+  def list(document: %Delta.Document{id: cid}), do: list(document: cid)
+
+  def list(document: cid) do
+    :mnesia.transaction fn ->
+      with {:document, [^cid]} <- {:document, Delta.Document.document_id(cid)} do
+        :mnesia.index_read(__MODULE__, cid, 2) # Erlang index is 1-based
+        |> Enum.map(&from_record/1)
+      else
+        {:document, []} -> :mnesia.abort("#{inspect(Delta.Document)} with id = #{cid} does not exists")
+      end
+    end
+  end
+
+  def get(m) do
+    :mnesia.transaction(fn ->
+      with [r] <- MnesiaHelper.get(m) do
+        r
+      else
+        [] -> :mnesia.abort("#{inspect(__MODULE__)} with id = #{m.id} does not exist")
+      end
+    end)
+  end
+
+  def create(%{collection_id: cid, latest_change_id: lid} = m) do
+    :mnesia.transaction(fn ->
+      with {:get, []} <- MnesiaHelper.get(m),
+           {:validate, {:ok, m}} <- {:validate, validate(m)} do
+        MnesiaHelper.write(m)
+      else
+        {:get, [_]} -> :mnesia.abort("#{inspect(__MODULE__)} with id = #{m.id} already exists")
+        {:validate, {:error, err}} -> :mnesia.abort(err)
+      end
+    end)
+  end
+
+  def update(%{collection_id: cid, latest_change_id: lid} = m) do
+    :mnesia.transaction(fn ->
+      with {:get, [_]} <- MnesiaHelper.get(m),
+           {:validate, {:ok, m}} <- {:validate, validate(m)} do
+        MnesiaHelper.write(m)
+      else
+        {:get, []} -> :mnesia.abort("#{inspect(__MODULE__)} with id = #{m.id} does not exist")
+        {:validate, {:error, err}} -> :mnesia.abort(err)
+      end
+    end)
+  end
+
+  def update(m, attrs), do: update(struct(m, attrs))
+
+  def delete(m) do
+    :mnesia.transaction(fn -> do_delete(m) end)
+  end
+
+  def do_delete(m) do
+    MnesiaHelper.delete(m)
+  end
+
+  def maybe_change_id(nil), do: [nil]
+  def maybe_change_id(id), do: change_id(id)
+
+  def change_id(id) do
     case MnesiaHelper.get(id) do
       [%{id: id}] -> [id]
       x -> x
