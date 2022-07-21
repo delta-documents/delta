@@ -6,19 +6,19 @@ defmodule Delta.Storage do
 
     :rpc.multicall(nodes, Application, :start, [:mnesia])
 
-    :mnesia.create_table(Delta.Storage.Collection,
+    :mnesia.create_table(Delta.Collection,
       attributes: [:id, :name],
       index: [:name],
       disc_copies: nodes
     )
 
-    :mnesia.create_table(Delta.Storage.Document,
+    :mnesia.create_table(Delta.Document,
       attributes: [:id, :collection_id, :latest_change_id, :data],
       index: [:collection_id, :latest_change_id],
       disc_copies: nodes
     )
 
-    :mnesia.create_table(Delta.Storage.Change,
+    :mnesia.create_table(Delta.Change,
       attributes:  [:id, :document_id, :previous_change_id, :kind, :path, :compiled_path, :value, :meta],
       index: [:document_id, :previous_change_id, :kind, :path],
       disc_copies: nodes
