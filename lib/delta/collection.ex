@@ -1,5 +1,7 @@
 defmodule Delta.Collection do
+  use Delta.Storage.RecordHelper
   defstruct [:id, :name]
+  use Delta.Storage.MnesiaHelper, struct: Delta.Collection
 
   def new(name \\ "unnamed_collection", id \\ UUID.uuid4()) do
     %__MODULE__{id: id, name: name}

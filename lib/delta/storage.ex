@@ -1,11 +1,4 @@
 defmodule Delta.Storage do
-  require Delta.Storage.MnesiaHelper
-  import Delta.Storage.MnesiaHelper
-
-  deftable(Collection, [:id, :name])
-  deftable(Document, [:id, :collection_id, :latest_change_id, :data])
-  deftable(Change, [:id, :document_id, :previous_change_id, :kind, :path, :compiled_path, :value, :meta])
-
   def migrate(nodes \\ [node()]) do
     :rpc.multicall(nodes, Application, :stop, [:mnesia])
 

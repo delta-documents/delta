@@ -1,7 +1,18 @@
 defmodule Delta.Change do
+  use Delta.Storage.RecordHelper
   defstruct [:id, :document_id, :previous_change_id, :kind, :path, :compiled_path, :value, :meta]
+  use Delta.Storage.MnesiaHelper, struct: Delta.Collection
 
-  def new(id0 \\ UUID.uuid4(), id1 \\ nil, id2 \\ nil, kind \\ :update, p1 \\ [], p2 \\ nil, v \\ nil, m \\ nil) do
+  def new(
+        id0 \\ UUID.uuid4(),
+        id1 \\ nil,
+        id2 \\ nil,
+        kind \\ :update,
+        p1 \\ [],
+        p2 \\ nil,
+        v \\ nil,
+        m \\ nil
+      ) do
     %__MODULE__{
       id: id0,
       document_id: id1,
