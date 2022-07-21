@@ -19,7 +19,7 @@ defmodule Delta.Storage do
     )
 
     :mnesia.create_table(Delta.Change,
-      attributes:  [:id, :document_id, :previous_change_id, :kind, :path, :compiled_path, :value, :meta],
+      attributes:  [:id, :document_id, :previous_change_id, :kind, :path, :value, :meta],
       index: [:document_id, :previous_change_id, :kind, :path],
       disc_copies: nodes
     )

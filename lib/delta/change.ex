@@ -1,6 +1,6 @@
 defmodule Delta.Change do
   use Delta.Storage.RecordHelper
-  defstruct [:id, :document_id, :previous_change_id, :kind, :path, :compiled_path, :value, :meta]
+  defstruct [:id, :document_id, :previous_change_id, :kind, :path, :value, :meta]
   use Delta.Storage.MnesiaHelper, struct: Delta.Collection
 
   def new(
@@ -19,13 +19,10 @@ defmodule Delta.Change do
       previous_change_id: id2,
       kind: kind,
       path: p1,
-      compiled_path: p2,
       value: v,
       meta: m
     }
   end
-
-  def compile(%__MODULE__{path: p} = m), do: Map.put(m, :compiled_path, Delta.Path.compile(p))
 
   def validate(%__MODULE__{
         id: id0,
@@ -33,7 +30,6 @@ defmodule Delta.Change do
         previous_change_id: id2,
         kind: kind,
         path: p1,
-        compiled_path: p2,
         value: v,
         meta: m
       }) do
@@ -49,7 +45,6 @@ defmodule Delta.Change do
          previous_change_id: id2,
          kind: kind,
          path: p1,
-         compiled_path: p2,
          value: v,
          meta: m
        }}
