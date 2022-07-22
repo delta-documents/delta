@@ -149,6 +149,5 @@ defmodule Delta.Document do
     end
   end
 
-  defp check_conflict(history, path), do: Enum.find(history, :resolvable, fn %{path: p} -> path_overlap?(path, p) end)
-  defp path_overlap?(p1, p2), do: List.starts_with?(p1, p2) or List.starts_with?(p2, p1)
+  defp check_conflict(history, path), do: Enum.find(history, :resolvable, fn %{path: p} -> Delta.Path.overlap?(path, p) end)
 end

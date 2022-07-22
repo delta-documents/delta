@@ -51,6 +51,8 @@ defmodule Delta.Path do
     |> compile()
   end
 
+  def overlap?(p1, p2), do: List.starts_with?(p1, p2) or List.starts_with?(p2, p1)
+
   root = ignore(string("$"))
 
   dot_notation = ignore(string(".")) |> utf8_string([?A..?z, ?0..?9, not: ?., not: ?[], min: 1)
