@@ -3,8 +3,6 @@ defmodule Delta.Collection do
   defstruct [:id, :name]
   use Delta.Storage.MnesiaHelper, struct: Delta.Collection
 
-  alias Delta.Collection.MnesiaHelper
-
   def new(name \\ "unnamed_collection", id \\ UUID.uuid4()) do
     %__MODULE__{id: id, name: name}
   end

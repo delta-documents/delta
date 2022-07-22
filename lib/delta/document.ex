@@ -3,6 +3,8 @@ defmodule Delta.Document do
   defstruct [:id, :collection_id, :latest_change_id, data: %{}]
   use Delta.Storage.MnesiaHelper, struct: Delta.Collection
 
+  alias Delta.{Change, Validators, Collection}
+
   def new(d \\ %{}, id1 \\ nil, id2 \\ nil, id0 \\ UUID.uuid4()) do
     %__MODULE__{id: id0, collection_id: id1, latest_change_id: id2, data: d}
   end
@@ -95,6 +97,37 @@ defmodule Delta.Document do
 
   def update(m, attrs), do: update(struct(m, attrs))
 
+  def add_changes(document, changes) do
+    :mnesia.transaction(fn ->
+      case get(document) do
+        {:atomic, d} -> do_add_changes(d, changes)
+        {:aborted, reason} -> :mnesia.abort(reason)
+      end
+    end)
+  end
+
+  def do_add_changes(%__MODULE__{latest_change_id: latest_id}, changes),
+    do: do_add_changes(latest_id, changes)
+
+  def do_add_changes(latest_id, [%Change{id: next_id, previous_change_id: latest_id} = change | changes]) do
+    case Change.create(change) do
+      {:atomic, _} -> [{:no_conflict, change} | do_add_changes(next_id, changes)]
+      {:aborted, reason} -> :mnesia.abort(reason)
+    end
+  end
+
+  def do_add_changes(latest_id0, [%Change{id: next_id, previous_change_id: latest_id1, path: p} = change | changes]) do
+    with {:history, {:atomic, history}} <- {:history, Change.list(from: latest_id0, to: latest_id1)},
+         {:conflict, :resolvable} <- {:conflict, check_conflict(history, p)},
+         resolved <- Map.put(change, :previous_id, latest_id0),
+         {:create, {:atomic, _}} <- Change.create(resolved) do
+      [{:resolved, resolved} | do_add_changes(next_id, changes)]
+    else
+      {:conflict, %{id: id}} -> :mnesia.abort("#{inspect(Change)} with id = #{next_id} conflicts with #{inspect(Change)} with id = #{id}")
+      {_, {:aborted, reason}} -> :mnesia.abort(reason)
+    end
+  end
+
   def delete(m) do
     :mnesia.transaction(fn -> do_delete(m) end)
   end
@@ -115,4 +148,7 @@ defmodule Delta.Document do
       x -> x
     end
   end
+
+  defp check_conflict(history, path), do: Enum.find(history, :resolvable, fn %{path: p} -> path_overlap?(path, p) end)
+  defp path_overlap?(p1, p2), do: List.starts_with?(p1, p2) or List.starts_with?(p2, p1)
 end

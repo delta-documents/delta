@@ -41,6 +41,8 @@ defmodule Delta.Storage.MnesiaHelper do
 
         defoverridable(list: 0, foldl: 2, foldr: 2, get: 1, write: 1, delete: 1)
       end
+
+      alias __MODULE__.MnesiaHelper
     end
   end
 end

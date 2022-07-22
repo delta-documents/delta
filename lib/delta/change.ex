@@ -3,6 +3,8 @@ defmodule Delta.Change do
   defstruct [:id, :document_id, :previous_change_id, :kind, :path, :value, :meta]
   use Delta.Storage.MnesiaHelper, struct: Delta.Collection
 
+  alias Delta.{Document, Validators}
+
   def new(
         id0 \\ UUID.uuid4(),
         id1 \\ nil,
@@ -32,11 +34,11 @@ defmodule Delta.Change do
         value: v,
         meta: m
       }) do
-    with {:ok, id0} <- Delta.Validators.uuid(id0, "#{__MODULE__}.id"),
-         {:ok, id1} <- Delta.Validators.uuid(id1, "#{__MODULE__}.document_id"),
-         {:ok, id2} <- Delta.Validators.maybe_uuid(id2, "#{__MODULE__}.previous_change_id"),
-         {:ok, p1} <- Delta.Validators.path(p1, "#{__MODULE__}.path"),
-         {:ok, kind} <- Delta.Validators.kind(kind, "#{__MODULE__}.kind") do
+    with {:ok, id0} <- Validators.uuid(id0, "#{__MODULE__}.id"),
+         {:ok, id1} <- Validators.uuid(id1, "#{__MODULE__}.document_id"),
+         {:ok, id2} <- Validators.maybe_uuid(id2, "#{__MODULE__}.previous_change_id"),
+         {:ok, p1} <- Validators.path(p1, "#{__MODULE__}.path"),
+         {:ok, kind} <- Validators.kind(kind, "#{__MODULE__}.kind") do
       {:ok,
        %__MODULE__{
          id: id0,
@@ -54,19 +56,32 @@ defmodule Delta.Change do
     :mnesia.transaction(fn -> MnesiaHelper.list() end)
   end
 
-  def list(document: %Delta.Document{id: cid}), do: list(document: cid)
+  def list(document: %Document{id: cid}), do: list(document: cid)
 
-  def list(document: cid) do
+  def list(document: did) do
     :mnesia.transaction(fn ->
-      with {:document, [^cid]} <- {:document, Delta.Document.document_id(cid)} do
+      with {:document, [^did]} <- {:document, Document.document_id(did)} do
         # Erlang index is 1-based
-        :mnesia.index_read(__MODULE__, cid, 2)
+        :mnesia.index_read(__MODULE__, did, 2)
         |> Enum.map(&from_record/1)
       else
         {:document, []} ->
-          :mnesia.abort("#{inspect(Delta.Document)} with id = #{cid} does not exists")
+          :mnesia.abort("#{inspect(Document)} with id = #{did} does not exists")
       end
     end)
+  end
+
+  def list(from: from, to: to) do
+    :mnesia.transaction(fn ->
+      do_list_from_to(from, to)
+    end)
+  end
+
+  def do_list_from_to(f, t) do
+    case MnesiaHelper.get(f) do
+      [%{previous_id: p} = c] -> [c | do_list_from_to(p, t)]
+      [] -> :mnesia.abort(:mnesia.abort("#{inspect(__MODULE__)} with id = #{f} does not exist"))
+    end
   end
 
   def get(m) do
@@ -83,7 +98,7 @@ defmodule Delta.Change do
     :mnesia.transaction(fn ->
       with {:get, []} <- MnesiaHelper.get(m),
            {:validate, {:ok, m}} <- {:validate, validate(m)},
-           {:document, [^did]} <- {:document, Delta.Document.document_id(did)},
+           {:document, [^did]} <- {:document, Document.document_id(did)},
            {:previous, [^pid]} <- {:previous, maybe_change_id(pid)} do
         MnesiaHelper.write(m)
       else
@@ -94,10 +109,10 @@ defmodule Delta.Change do
           :mnesia.abort(err)
 
         {:document, []} ->
-          :mnesia.abort("#{inspect(Delta.Document)} with id = #{did} does not exists")
+          :mnesia.abort("#{inspect(Document)} with id = #{did} does not exists")
 
         {:previous, []} ->
-          :mnesia.abort("#{inspect(Delta.Change)} with id = #{pid} does not exists")
+          :mnesia.abort("#{inspect(Change)} with id = #{pid} does not exists")
       end
     end)
   end
@@ -106,7 +121,7 @@ defmodule Delta.Change do
     :mnesia.transaction(fn ->
       with {:get, [_]} <- MnesiaHelper.get(m),
            {:validate, {:ok, m}} <- {:validate, validate(m)},
-           {:document, [^did]} <- {:document, Delta.Document.document_id(did)},
+           {:document, [^did]} <- {:document, Document.document_id(did)},
            {:previous, [^pid]} <- {:previous, maybe_change_id(pid)} do
         MnesiaHelper.write(m)
       else
@@ -117,10 +132,10 @@ defmodule Delta.Change do
           :mnesia.abort(err)
 
         {:document, []} ->
-          :mnesia.abort("#{inspect(Delta.Document)} with id = #{did} does not exists")
+          :mnesia.abort("#{inspect(Document)} with id = #{did} does not exists")
 
         {:previous, []} ->
-          :mnesia.abort("#{inspect(Delta.Change)} with id = #{pid} does not exists")
+          :mnesia.abort("#{inspect(Change)} with id = #{pid} does not exists")
       end
     end)
   end
