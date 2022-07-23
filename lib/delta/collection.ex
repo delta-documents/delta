@@ -3,17 +3,24 @@ defmodule Delta.Collection do
   defstruct [:id, :name]
   use Delta.Storage.MnesiaHelper, struct: Delta.Collection
 
+  alias Delta.Errors.{DoesNotExist, AlreadyExist, Validation}
+
   def new(name \\ "unnamed_collection", id \\ UUID.uuid4()) do
     %__MODULE__{id: id, name: name}
   end
 
   def validate(%__MODULE__{id: id, name: name}) do
-    with {:ok, id} <- Delta.Validators.uuid(id, "#{inspect(__MODULE__)}.id") do
+    with {:ok, id} <- Delta.Validators.uuid(id, %Validation{struct: __MODULE__, field: :id}) do
       {:ok, %__MODULE__{id: id, name: name}}
     end
   end
 
-  def validate(_), do: {:error, "Not an instance of #{inspect(__MODULE__)}"}
+  def validate(_) do
+    {
+      :error,
+      %Validation{struct: __MODULE__, field: :*, expected: __MODULE__, got: "not an instance of"}
+    }
+  end
 
   def list do
     :mnesia.transaction(fn -> MnesiaHelper.list() end)
@@ -21,39 +28,39 @@ defmodule Delta.Collection do
 
   def get(m) do
     :mnesia.transaction(fn ->
-      with [r] <- MnesiaHelper.get(m) do
-        r
-      else
-        [] -> :mnesia.abort("#{inspect(__MODULE__)} with id = #{m.id} does not exist")
+      case MnesiaHelper.get(m) do
+        [r] -> r
+        [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: m})
       end
     end)
   end
 
   def create(m) do
     :mnesia.transaction(fn ->
-      with {:get, []} <- MnesiaHelper.get(m),
-           {:validate, {:ok, m}} <- {:validate, validate(m)} do
-        MnesiaHelper.write(m)
-      else
-        {:get, [_]} -> :mnesia.abort("#{inspect(__MODULE__)} with id = #{m.id} does not exist")
-        {:validate, {:error, err}} -> :mnesia.abort(err)
-      end
-    end)
-  end
-
-  def update(m) do
-    :mnesia.transaction(fn ->
-      with {:get, [_]} <- MnesiaHelper.get(m),
-           {:validate, {:ok, m}} <- {:validate, validate(m)} do
-        MnesiaHelper.write(m)
-      else
-        {:get, []} -> :mnesia.abort("#{inspect(__MODULE__)} with id = #{m.id} already exists")
-        {:validate, {:error, err}} -> :mnesia.abort(err)
+      case MnesiaHelper.get(m) do
+        [] -> validated_write(m)
+        [_] -> :mnesia.abort(%AlreadyExist{struct: __MODULE__, id: m})
       end
     end)
   end
 
   def update(m, attrs), do: update(struct(m, attrs))
+
+  def update(m) do
+    :mnesia.transaction(fn ->
+      case MnesiaHelper.get(m) do
+        [_] -> validated_write(m)
+        [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: m})
+      end
+    end)
+  end
+
+  defp validated_write(m) do
+    case validate(m) do
+      {:ok, m} -> MnesiaHelper.write(m)
+      {:error, err} -> :mnesia.abort(err)
+    end
+  end
 
   def delete(m) do
     :mnesia.transaction(fn -> do_delete(m) end)

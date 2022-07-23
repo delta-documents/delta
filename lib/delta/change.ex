@@ -4,6 +4,7 @@ defmodule Delta.Change do
   use Delta.Storage.MnesiaHelper, struct: Delta.Collection
 
   alias Delta.{Document, Validators}
+  alias Delta.Errors.{DoesNotExist, AlreadyExist, Validation}
 
   def new(
         id0 \\ UUID.uuid4(),
@@ -34,11 +35,11 @@ defmodule Delta.Change do
         value: v,
         meta: m
       }) do
-    with {:ok, id0} <- Validators.uuid(id0, "#{__MODULE__}.id"),
-         {:ok, id1} <- Validators.uuid(id1, "#{__MODULE__}.document_id"),
-         {:ok, id2} <- Validators.maybe_uuid(id2, "#{__MODULE__}.previous_change_id"),
-         {:ok, p1} <- Validators.path(p1, "#{__MODULE__}.path"),
-         {:ok, kind} <- Validators.kind(kind, "#{__MODULE__}.kind") do
+    with {:ok, id0} <- Validators.uuid(id0, %Validation{struct: __MODULE__, field: :id}),
+         {:ok, id1} <- Validators.uuid(id1, %Validation{struct: __MODULE__, field: :document_id}),
+         {:ok, id2} <- Validators.maybe_uuid(id2, %Validation{struct: __MODULE__, field: :previous_change_id}),
+         {:ok, p1} <- Validators.path(p1, %Validation{struct: __MODULE__, field: :path}),
+         {:ok, kind} <- Validators.kind(kind, %Validation{struct: __MODULE__, field: :kind}) do
       {:ok,
        %__MODULE__{
          id: id0,
@@ -66,7 +67,7 @@ defmodule Delta.Change do
         |> Enum.map(&from_record/1)
       else
         {:document, []} ->
-          :mnesia.abort("#{inspect(Document)} with id = #{did} does not exists")
+          :mnesia.abort(%DoesNotExist{struct: Document, id: did})
       end
     end)
   end
@@ -80,67 +81,57 @@ defmodule Delta.Change do
   def do_list_from_to(f, t) do
     case MnesiaHelper.get(f) do
       [%{previous_id: p} = c] -> [c | do_list_from_to(p, t)]
-      [] -> :mnesia.abort(:mnesia.abort("#{inspect(__MODULE__)} with id = #{f} does not exist"))
+      [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: f})
     end
   end
 
-  def get(m) do
+  def create(m) do
     :mnesia.transaction(fn ->
-      with [r] <- MnesiaHelper.get(m) do
-        r
-      else
-        [] -> :mnesia.abort("#{inspect(__MODULE__)} with id = #{m.id} does not exist")
-      end
-    end)
-  end
-
-  def create(%{document_id: did, previous_change_id: pid} = m) do
-    :mnesia.transaction(fn ->
-      with {:get, []} <- MnesiaHelper.get(m),
-           {:validate, {:ok, m}} <- {:validate, validate(m)},
-           {:document, [^did]} <- {:document, Document.document_id(did)},
-           {:previous, [^pid]} <- {:previous, maybe_change_id(pid)} do
-        MnesiaHelper.write(m)
-      else
-        {:get, [_]} ->
-          :mnesia.abort("#{inspect(__MODULE__)} with id = #{m.id} already exists")
-
-        {:validate, {:error, err}} ->
-          :mnesia.abort(err)
-
-        {:document, []} ->
-          :mnesia.abort("#{inspect(Document)} with id = #{did} does not exists")
-
-        {:previous, []} ->
-          :mnesia.abort("#{inspect(Change)} with id = #{pid} does not exists")
-      end
-    end)
-  end
-
-  def update(%{document_id: did, previous_change_id: pid} = m) do
-    :mnesia.transaction(fn ->
-      with {:get, [_]} <- MnesiaHelper.get(m),
-           {:validate, {:ok, m}} <- {:validate, validate(m)},
-           {:document, [^did]} <- {:document, Document.document_id(did)},
-           {:previous, [^pid]} <- {:previous, maybe_change_id(pid)} do
-        MnesiaHelper.write(m)
-      else
-        {:get, []} ->
-          :mnesia.abort("#{inspect(__MODULE__)} with id = #{m.id} does not exist")
-
-        {:validate, {:error, err}} ->
-          :mnesia.abort(err)
-
-        {:document, []} ->
-          :mnesia.abort("#{inspect(Document)} with id = #{did} does not exists")
-
-        {:previous, []} ->
-          :mnesia.abort("#{inspect(Change)} with id = #{pid} does not exists")
+      case MnesiaHelper.get(m) do
+        [] -> validated_write(m)
+        [_] -> :mnesia.abort(%AlreadyExist{struct: __MODULE__, id: m})
       end
     end)
   end
 
   def update(m, attrs), do: update(struct(m, attrs))
+
+  def update(m) do
+    :mnesia.transaction(fn ->
+      case MnesiaHelper.get(m) do
+        [_] -> validated_write(m)
+        [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: m})
+      end
+    end)
+  end
+
+  def get(m) do
+    :mnesia.transaction(fn ->
+      case MnesiaHelper.get(m) do
+        [r] -> r
+        [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: m})
+      end
+    end)
+  end
+
+  def validated_write(%{document_id: did, previous_change_id: pid} = m) do
+    :mnesia.transaction(fn ->
+      with {:validate, {:ok, m}} <- {:validate, validate(m)},
+           {:document, [^did]} <- {:document, Document.document_id(did)},
+           {:previous, [^pid]} <- {:previous, maybe_change_id(pid)} do
+        MnesiaHelper.write(m)
+      else
+        {:validate, {:error, err}} ->
+          :mnesia.abort(err)
+
+        {:document, []} ->
+          :mnesia.abort(%DoesNotExist{struct: Document, id: did})
+
+        {:previous, []} ->
+          :mnesia.abort(%DoesNotExist{struct: Change, id: pid})
+      end
+    end)
+  end
 
   def delete(m) do
     :mnesia.transaction(fn -> do_delete(m) end)
