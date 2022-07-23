@@ -3,7 +3,7 @@ defmodule Delta.Collection do
   defstruct [:id, :name]
   use Delta.Storage.MnesiaHelper, struct: Delta.Collection
 
-  alias Delta.Errors.{DoesNotExist, AlreadyExist, Validation}
+  alias Delta.Errors.Validation
 
   def new(name \\ "unnamed_collection", id \\ UUID.uuid4()) do
     %__MODULE__{id: id, name: name}
@@ -22,64 +22,23 @@ defmodule Delta.Collection do
     }
   end
 
-  def list do
-    :mnesia.transaction(fn -> MnesiaHelper.list() end)
-  end
-
-  def get(m) do
-    :mnesia.transaction(fn ->
-      case MnesiaHelper.get(m) do
-        [r] -> r
-        [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: m})
-      end
-    end)
-  end
-
-  def create(m) do
-    :mnesia.transaction(fn ->
-      case MnesiaHelper.get(m) do
-        [] -> validated_write(m)
-        [_] -> :mnesia.abort(%AlreadyExist{struct: __MODULE__, id: m})
-      end
-    end)
-  end
-
-  def update(m, attrs), do: update(struct(m, attrs))
-
-  def update(m) do
-    :mnesia.transaction(fn ->
-      case MnesiaHelper.get(m) do
-        [_] -> validated_write(m)
-        [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: m})
-      end
-    end)
-  end
-
-  defp validated_write(m) do
+  def write(m) do
     case validate(m) do
-      {:ok, m} -> MnesiaHelper.write(m)
+      {:ok, m} -> super(m)
       {:error, err} -> :mnesia.abort(err)
     end
   end
 
   def delete(m) do
-    :mnesia.transaction(fn -> do_delete(m) end)
-  end
+    case id(m) do
+      [id] ->
+        :mnesia.index_read(Delta.Document, id, 2)
+        |> Enum.map(&Delta.Document.delete(elem(&1, 0)))
 
-  def do_delete(%__MODULE__{id: id}), do: do_delete(id)
+        super(id)
 
-  def do_delete(id) do
-    # Erlang index is 1-based
-    :mnesia.index_read(Delta.Document, id, 2)
-    |> Enum.map(&Delta.Document.do_delete(elem(&1, 1)))
-
-    MnesiaHelper.delete(id)
-  end
-
-  def collection_id(id) do
-    case MnesiaHelper.get(id) do
-      [%{id: id}] -> [id]
-      x -> x
+      _ ->
+        :ok
     end
   end
 end

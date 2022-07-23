@@ -4,7 +4,7 @@ defmodule Delta.Document do
   use Delta.Storage.MnesiaHelper, struct: Delta.Document
 
   alias Delta.{Change, Validators, Collection}
-  alias Delta.Errors.{DoesNotExist, AlreadyExist, Validation, Conflict}
+  alias Delta.Errors.{Validation, Conflict}
 
   def new(d \\ %{}, id1 \\ nil, id2 \\ nil, id0 \\ UUID.uuid4()) do
     %__MODULE__{id: id0, collection_id: id1, latest_change_id: id2, data: d}
@@ -28,15 +28,11 @@ defmodule Delta.Document do
     }
   end
 
-  def list do
-    :mnesia.transaction(fn -> MnesiaHelper.list() end)
-  end
-
   def list(collection: %Collection{id: cid}), do: list(collection: cid)
 
   def list(collection: cid) do
     :mnesia.transaction(fn ->
-      with {:collection, [^cid]} <- {:collection, Collection.collection_id(cid)} do
+      with {:collection, [^cid]} <- {:collection, Collection.id(cid)} do
         # Erlang index is 1-based
         :mnesia.index_read(__MODULE__, cid, 2)
         |> Enum.map(&from_record/1)
@@ -47,41 +43,11 @@ defmodule Delta.Document do
     end)
   end
 
-  def get(m) do
-    :mnesia.transaction(fn ->
-      with [r] <- MnesiaHelper.get(m) do
-        r
-      else
-        [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: m})
-      end
-    end)
-  end
-
-  def create(m) do
-    :mnesia.transaction(fn ->
-      case MnesiaHelper.get(m) do
-        [] -> validated_write(m)
-        [_] -> :mnesia.abort(%AlreadyExist{struct: __MODULE__, id: m})
-      end
-    end)
-  end
-
-  def update(m, attrs), do: update(struct(m, attrs))
-
-  def update(m) do
-    :mnesia.transaction(fn ->
-      case MnesiaHelper.get(m) do
-        [_] -> validated_write(m)
-        [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: m})
-      end
-    end)
-  end
-
-  defp validated_write(%{collection_id: cid, latest_change_id: lid} = m) do
+  def write(%{collection_id: cid, latest_change_id: lid} = m) do
     with {:validate, {:ok, m}} <- {:validate, validate(m)},
-         {:collection, [^cid]} <- {:collection, Collection.collection_id(cid)},
-         {:latest_change, [^lid]} <- {:latest_change, Delta.Change.maybe_change_id(lid)} do
-      MnesiaHelper.write(m)
+         {:collection, [^cid]} <- {:collection, Collection.id(cid)},
+         {:latest_change, [^lid]} <- {:latest_change, Delta.Change.maybe_id(lid)} do
+      super(m)
     else
       {:validate, {:error, err}} ->
         :mnesia.abort(err)
@@ -94,10 +60,22 @@ defmodule Delta.Document do
     end
   end
 
+  def delete(m) do
+    case id(m) do
+      [id] ->
+        :mnesia.index_read(Delta.Change, id, 2)
+        |> Enum.map(&Delta.Change.delete(elem(&1, 1)))
+
+        super(id)
+
+      _ ->
+        :ok
+    end
+  end
 
   def add_changes(document, changes) do
     :mnesia.transaction(fn ->
-      case get(document) do
+      case get_transaction(document) do
         {:atomic, d} -> do_add_changes(d, changes)
         {:aborted, reason} -> :mnesia.abort(reason)
       end
@@ -110,7 +88,7 @@ defmodule Delta.Document do
   def do_add_changes(latest_id, [
         %Change{id: next_id, previous_change_id: latest_id} = change | changes
       ]) do
-    case Change.create(change) do
+    case Change.create_transaction(change) do
       {:atomic, _} -> [{:no_conflict, change} | do_add_changes(next_id, changes)]
       {:aborted, reason} -> :mnesia.abort(reason)
     end
@@ -119,36 +97,14 @@ defmodule Delta.Document do
   def do_add_changes(latest_id0, [
         %Change{id: next_id, previous_change_id: latest_id1, path: p} = change | changes
       ]) do
-    with {:history, {:atomic, history}} <-
-           {:history, Change.list(from: latest_id0, to: latest_id1)},
+    with {:atomic, history} <- Change.list(from: latest_id0, to: latest_id1),
          {:conflict, :resolvable} <- {:conflict, check_conflict(history, p)},
          resolved <- Map.put(change, :previous_id, latest_id0),
-         {:create, {:atomic, _}} <- Change.create(resolved) do
+         {:atomic, _} <- Change.create_transaction(resolved) do
       [{:resolved, resolved} | do_add_changes(next_id, changes)]
     else
       {:conflict, %{id: id}} -> :mnesia.abort(%Conflict{change_id: next_id, conflicts_with: id})
       {_, {:aborted, reason}} -> :mnesia.abort(reason)
-    end
-  end
-
-  def delete(m) do
-    :mnesia.transaction(fn -> do_delete(m) end)
-  end
-
-  def do_delete(%__MODULE__{id: id}), do: do_delete(id)
-
-  def do_delete(id) do
-    # Erlang index is 1-based
-    :mnesia.index_read(Delta.Change, id, 2)
-    |> Enum.map(&Delta.Change.do_delete(elem(&1, 1)))
-
-    MnesiaHelper.delete(id)
-  end
-
-  def document_id(id) do
-    case MnesiaHelper.get(id) do
-      [%{id: id}] -> [id]
-      x -> x
     end
   end
 
