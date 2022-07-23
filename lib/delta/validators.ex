@@ -13,8 +13,8 @@ defmodule Delta.Validators do
       {:error, "Invalid argument; Expected: String"} ->
         {:error, Map.merge(err, %{expected: "UUID", got: "#{inspect(id)}"})}
 
-      {:error, err} ->
-        {:error, Map.merge(err, %{expected: "UUID", got: err})}
+      {:error, e} ->
+        {:error, Map.merge(err, %{expected: "UUID", got: e})}
     end
   end
 
