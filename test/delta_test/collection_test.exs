@@ -7,9 +7,9 @@ defmodule DeltaTest.CollectionTest do
   alias Delta.Collection
 
   test "Collection.validate/1" do
-    assert {:ok, _} = Collection.validate(collection())
-    assert {:error, _} = Collection.validate(%Collection{id: "not_an_uuid"})
-    assert {:error, _} = Collection.validate("not a collection")
+    assert {:ok, _} = collection() |> Collection.validate()
+    assert {:error, _} = %Collection{id: "not_an_uuid"} |> Collection.validate()
+    assert {:error, _} = "not a collection" |> Collection.validate()
   end
 
   test "Collection.new/2 generates unique and correct uuid" do
@@ -67,7 +67,7 @@ defmodule DeltaTest.CollectionTest do
     {:atomic, d} = create_document()
     {:atomic, m} = create_change()
 
-    assert {:atomic, :ok} = Collection.delete_transaction(collection())
+    assert {:atomic, :ok} = Collection.delete_transaction(c)
 
     assert {:aborted, _} = Collection.get_transaction(c)
     assert {:aborted, _} = Delta.Document.get_transaction(d)
