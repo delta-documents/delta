@@ -1,10 +1,8 @@
-defmodule MnesiaTestHelper do
-  defmacro __using__(_) do
-    quote do
-      setup do
-        on_exit(&MnesiaTestHelper.clear/0)
-      end
-    end
+defmodule DeltaTest.Case do
+  use ExUnit.CaseTemplate
+
+  setup do
+    on_exit(&clear/0)
   end
 
   def clear() do

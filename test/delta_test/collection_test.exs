@@ -1,6 +1,5 @@
 defmodule DeltaTest.CollectionTest do
-  use ExUnit.Case
-  use MnesiaTestHelper
+  use DeltaTest.Case
   doctest Delta.Collection
 
   import Fixtures
@@ -25,22 +24,22 @@ defmodule DeltaTest.CollectionTest do
   test "Collection.get/1" do
     c = collection()
 
-    assert {:aborted, _} = Collection.get(c)
+    assert {:aborted, _} = Collection.get_transaction(c)
 
     create_collection()
 
-    assert {:atomic, ^c} = Collection.get(c.id)
-    assert {:atomic, ^c} = Collection.get(c)
+    assert {:atomic, ^c} = Collection.get_transaction(c.id)
+    assert {:atomic, ^c} = Collection.get_transaction(c)
   end
 
   test "Collection.list/0" do
     c = collection()
 
-    assert {:atomic, []} = Collection.list()
+    assert {:atomic, []} = Collection.list_transaction()
 
     create_collection()
 
-    assert {:atomic, [^c]} = Collection.list()
+    assert {:atomic, [^c]} = Collection.list_transaction()
   end
 
   test "Collection.create/1 creates collection if one does not exist" do
