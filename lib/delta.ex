@@ -1,3 +1,2 @@
 defmodule Delta do
-
 end

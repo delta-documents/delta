@@ -1,5 +1,6 @@
 defmodule DeltaTest.StorageTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+
   use Delta.Storage.RecordHelper
 
   alias __MODULE__, as: S

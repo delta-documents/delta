@@ -1,5 +1,6 @@
 defmodule DeltaTest.ValidatorsTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+
   alias Delta.Validators
 
   test "Delta.Validators.uuid/2 validates uuid to be default and v4" do

@@ -1,5 +1,5 @@
 defmodule DeltaTest.ErrorsTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   alias Delta.Errors.{DoesNotExist, AlreadyExist, Validation, Conflict}
   alias Delta.Errors

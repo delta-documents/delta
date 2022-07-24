@@ -1,7 +1,8 @@
 defmodule DeltaTest.PathTest do
-  import Delta.Path
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   doctest Delta.Path
+
+  import Delta.Path
 
   test "Delta.Path.parse/1 reports errors" do
     {:error, _} = parse("$.store.book[*].author")

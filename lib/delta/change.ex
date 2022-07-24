@@ -75,7 +75,7 @@ defmodule Delta.Change do
   end
 
   def list_transaction(document), do: :mnesia.transaction(fn -> list(document) end)
-  
+
   def list_transaction(from, to), do: :mnesia.transaction(fn -> list(from, to) end)
 
   def write(%{document_id: did, previous_change_id: pid} = m) do

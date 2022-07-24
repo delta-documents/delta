@@ -39,5 +39,7 @@ end
 
 defimpl String.Chars, for: Conflict do
   def to_string(%{change_id: id0, conflicts_with: id1, message: m}),
-    do: "Delta.Change with id = #{E.get_id(id0)} conflicts with Delta.Change with id = #{E.get_id(id1)}." |> E.m_m(m)
+    do:
+      "Delta.Change with id = #{E.get_id(id0)} conflicts with Delta.Change with id = #{E.get_id(id1)}."
+      |> E.m_m(m)
 end

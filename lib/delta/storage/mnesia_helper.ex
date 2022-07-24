@@ -32,19 +32,19 @@ defmodule Delta.Storage.MnesiaHelper do
       def create(m) do
         case get(m) do
           [] -> write(m)
-          [_] -> :mnesia.abort(%AlreadyExist{struct: __MODULE__, id: m})
+          [_] -> :mnesia.abort(%AlreadyExist{struct: __MODULE__, id: m.id})
         end
       end
 
       def update(m, attrs \\ %{}) do
         case get(m) do
           [m] -> write(struct(m, attrs))
-          [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: m})
+          [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: m.id})
         end
       end
 
       def write(%unquote(struct){} = m) do
-        :mnesia.write(unquote(struct).to_record(m))
+        with :ok <- :mnesia.write(unquote(struct).to_record(m)), do: m
       end
 
       def delete(%unquote(struct){id: id}) do
@@ -62,9 +62,8 @@ defmodule Delta.Storage.MnesiaHelper do
         end
       end
 
-      def maybe_id(nil), do: nil
+      def maybe_id(nil), do: [nil]
       def maybe_id(id), do: id(id)
-
 
       # Transactions
 
