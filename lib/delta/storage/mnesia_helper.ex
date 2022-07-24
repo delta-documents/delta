@@ -28,6 +28,20 @@ defmodule Delta.Storage.MnesiaHelper do
         |> Enum.map(&unquote(struct).from_record(&1))
       end
 
+      def create(m) do
+        case get(m) do
+          [] -> write(m)
+          [_] -> :mnesia.abort(%AlreadyExist{struct: __MODULE__, id: m})
+        end
+      end
+
+      def update(m, attrs \\ %{}) do
+        case get(m) do
+          [m] -> write(struct(m, attrs))
+          [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: m})
+        end
+      end
+
       def write(%unquote(struct){} = m) do
         :mnesia.write(unquote(struct).to_record(m))
       end
@@ -65,32 +79,11 @@ defmodule Delta.Storage.MnesiaHelper do
         end)
       end
 
-      def create_transaction(m) do
-        :mnesia.transaction(fn ->
-          case get(m) do
-            [] -> write(m)
-            [_] -> :mnesia.abort(%AlreadyExist{struct: __MODULE__, id: m})
-          end
-        end)
-      end
+      def create_transaction(m), do: :mnesia.transaction(fn -> create(m) end)
 
-      def update_transaction(m, attrs) do
-        :mnesia.transaction(fn ->
-          case get(m) do
-            [m] -> write(struct(m, attrs))
-            [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: m})
-          end
-        end)
-      end
+      def update_transaction(m, attrs \\ %{}), do: :mnesia.transaction(fn -> update(m, attrs) end)
 
-      def update_transaction(m) do
-        :mnesia.transaction(fn ->
-          case get(m) do
-            [_] -> write(m)
-            [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: m})
-          end
-        end)
-      end
+      def write_transaction(m), do: :mnesia.transaction(fn -> write(m) end)
 
       def delete_transaction(m), do: :mnesia.transaction(fn -> delete(m) end)
 
