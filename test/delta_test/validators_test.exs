@@ -3,8 +3,8 @@ defmodule DeltaTest.ValidatorsTest do
   alias Delta.Validators
 
   test "Validators.uuid/2 validates uuid to be default and v4" do
-    u = Validators.uuid(UUID.uuid4())
-    assert {:ok, u} = u
+    u = UUID.uuid4()
+    assert {:ok, ^u} = Validators.uuid(u)
 
     assert {:error, %{got: "UUID of type hex"}} = Validators.uuid(UUID.uuid4(:hex))
     assert {:error, %{got: "UUIDv1"}} = Validators.uuid(UUID.uuid1())
@@ -38,6 +38,6 @@ defmodule DeltaTest.ValidatorsTest do
     assert {:ok, :remove} = Validators.kind(:remove)
     assert {:ok, :delete} = Validators.kind(:delete)
 
-    assert {:error, %{got: "smth"}} = Validators.kind(:smth)
+    assert {:error, %{got: ":smth"}} = Validators.kind(:smth)
   end
 end
