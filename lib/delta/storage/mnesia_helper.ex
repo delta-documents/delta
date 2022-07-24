@@ -42,7 +42,7 @@ defmodule Delta.Storage.MnesiaHelper do
 
       def id(id) do
         case get(id) do
-          [%{id: id}] -> id
+          [%{id: id}] -> [id]
           x -> x
         end
       end

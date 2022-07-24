@@ -28,20 +28,20 @@ defmodule Delta.Document do
     }
   end
 
-  def list(collection: %Collection{id: cid}), do: list(collection: cid)
+  def list(%Collection{id: cid}), do: list(cid)
 
-  def list(collection: cid) do
-    :mnesia.transaction(fn ->
-      with {:collection, [^cid]} <- {:collection, Collection.id(cid)} do
-        # Erlang index is 1-based
-        :mnesia.index_read(__MODULE__, cid, 2)
-        |> Enum.map(&from_record/1)
-      else
-        {:collection, []} ->
-          :mnesia.abort(%DoesNotExist{struct: Collection, id: cid})
-      end
-    end)
+  def list(cid) do
+    with {:collection, [^cid]} <- {:collection, Collection.id(cid)} do
+      # Erlang index is 1-based
+      :mnesia.index_read(__MODULE__, cid, 2)
+      |> Enum.map(&from_record/1)
+    else
+      {:collection, []} ->
+        :mnesia.abort(%DoesNotExist{struct: Collection, id: cid})
+    end
   end
+
+  def list_transaction(collection), do: :mnesia.transaction(fn -> list(collection) end)
 
   def write(%{collection_id: cid, latest_change_id: lid} = m) do
     with {:validate, {:ok, m}} <- {:validate, validate(m)},

@@ -37,7 +37,8 @@ defmodule Delta.Change do
       }) do
     with {:ok, id0} <- Validators.uuid(id0, %Validation{struct: __MODULE__, field: :id}),
          {:ok, id1} <- Validators.uuid(id1, %Validation{struct: __MODULE__, field: :document_id}),
-         {:ok, id2} <- Validators.maybe_uuid(id2, %Validation{struct: __MODULE__, field: :previous_change_id}),
+         {:ok, id2} <-
+           Validators.maybe_uuid(id2, %Validation{struct: __MODULE__, field: :previous_change_id}),
          {:ok, p1} <- Validators.path(p1, %Validation{struct: __MODULE__, field: :path}),
          {:ok, kind} <- Validators.kind(kind, %Validation{struct: __MODULE__, field: :kind}) do
       {:ok,
@@ -53,33 +54,29 @@ defmodule Delta.Change do
     end
   end
 
-  def list(document: %Document{id: cid}), do: list(document: cid)
+  def list(%Document{id: cid}), do: list(cid)
 
-  def list(document: did) do
-    :mnesia.transaction(fn ->
-      with {:document, [^did]} <- {:document, Document.id(did)} do
-        # Erlang index is 1-based
-        :mnesia.index_read(__MODULE__, did, 2)
-        |> Enum.map(&from_record/1)
-      else
-        {:document, []} ->
-          :mnesia.abort(%DoesNotExist{struct: Document, id: did})
-      end
-    end)
-  end
-
-  def list(from: from, to: to) do
-    :mnesia.transaction(fn ->
-      do_list_from_to(from, to)
-    end)
-  end
-
-  def do_list_from_to(f, t) do
-    case get(f) do
-      [%{previous_id: p} = c] -> [c | do_list_from_to(p, t)]
-      [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: f})
+  def list(did) do
+    with {:document, [^did]} <- {:document, Document.id(did)} do
+      # Erlang index is 1-based
+      :mnesia.index_read(__MODULE__, did, 2)
+      |> Enum.map(&from_record/1)
+    else
+      {:document, []} ->
+        :mnesia.abort(%DoesNotExist{struct: Document, id: did})
     end
   end
+
+  def list(from, to) do
+    case get(from) do
+      [%{previous_id: p} = c] -> [c | list(p, to)]
+      [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: from})
+    end
+  end
+
+  def list_transaction(document), do: :mnesia.transaction(fn -> list(document) end)
+  
+  def list_transaction(from, to), do: :mnesia.transaction(fn -> list(from, to) end)
 
   def write(%{document_id: did, previous_change_id: pid} = m) do
     :mnesia.transaction(fn ->
