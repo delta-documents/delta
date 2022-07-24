@@ -1,6 +1,7 @@
 defmodule Delta.Storage.MnesiaHelper do
   defmacro __using__(struct: struct) do
     quote do
+      alias Delta.Errors.{DoesNotExist, AlreadyExist, Validation}
       # Inside transaction
 
       def list, do: foldl([], &[&1 | &2])
@@ -64,7 +65,6 @@ defmodule Delta.Storage.MnesiaHelper do
       def maybe_id(nil), do: nil
       def maybe_id(id), do: id(id)
 
-      alias Delta.Errors.{DoesNotExist, AlreadyExist, Validation}
 
       # Transactions
 
