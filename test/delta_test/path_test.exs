@@ -45,6 +45,25 @@ defmodule DeltaTest.PathTest do
   end
 
   test "Delta.Path.compile/1 compiles correct Pathex path" do
-    assert Delta.Path.compile(["a", "b"]) |> Pathex.inspect() == ~S/path("b") ~> path("a")/
+    assert compile([]) |> Pathex.inspect() == "matching(_)"
+    assert compile(["a", "b"]) |> Pathex.inspect() == ~S/path("b") ~> path("a")/
+  end
+
+  test "Delta.Path.path! parses path and raises" do
+    assert_raise MatchError, fn -> parse!("A") end
+    assert ["A"] = parse!(".A")
+  end
+
+  test "Delta.Path.sigil_p/2 parses and compiles path" do
+    assert ~p($.a.b) |> Pathex.inspect() == ~S/path("b") ~> path("a")/
+  end
+
+  test "Delta.Path.overlap?/2 is true if path points to same value or sub-value" do
+    assert overlap?([:a, :b], [:a, :b])
+    assert overlap?([:a, :b, :c], [:a, :b])
+    assert overlap?([:a, :b], [:a, :b, :c])
+    assert overlap?([], [:a])
+
+    assert not overlap?([:a, :b], [:a, :c])
   end
 end
