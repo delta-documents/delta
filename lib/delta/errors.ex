@@ -1,7 +1,7 @@
 defmodule Delta.Errors do
   defmodule DoesNotExist, do: defstruct([:struct, :id, :message])
   defmodule AlreadyExist, do: defstruct([:struct, :id, :message])
-  defmodule Validation, do: defstruct([:struct, :field, :expected, :got])
+  defmodule Validation, do: defstruct([:struct, :field, :expected, :got, :message])
   defmodule Conflict, do: defstruct([:change_id, :conflicts_with, :message])
 
   def get_struct(%{__struct__: s}), do: s
@@ -27,7 +27,7 @@ defimpl String.Chars, for: DoesNotExist do
     do: "#{E.i_s(s)} with id = #{E.get_id(id)} does not exist." |> E.m_m(m)
 end
 
-defimpl String.Chars, for: DoesNotExist do
+defimpl String.Chars, for: AlreadyExist do
   def to_string(%{struct: s, id: id, message: m}),
     do: "#{E.i_s(s)} with id = #{E.get_id(id)} already exists." |> E.m_m(m)
 end
