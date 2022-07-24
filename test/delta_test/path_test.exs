@@ -43,4 +43,8 @@ defmodule DeltaTest.PathTest do
     assert path3 == ["a", "b"]
     assert path4 == ["a", "b", 1]
   end
+
+  test "Delta.Path.compile/1 compiles correct Pathex path" do
+    assert Delta.Path.compile(["a", "b"]) |> Pathex.inspect() == ~S/path("b") ~> path("a")/
+  end
 end
