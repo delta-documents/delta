@@ -1,19 +1,29 @@
 defmodule Delta.Change do
   use Delta.Storage.RecordHelper
-  defstruct [:id, :document_id, :previous_change_id, :kind, :path, :value, :meta]
-  use Delta.Storage.MnesiaHelper, struct: Delta.Collection
+
+  defstruct [
+    :id,
+    :document_id,
+    :previous_change_id,
+    kind: :update,
+    path: [],
+    value: %{},
+    meta: nil
+  ]
+
+  use Delta.Storage.MnesiaHelper, struct: Delta.Change
 
   alias Delta.{Document, Validators}
   alias Delta.Errors.{Validation}
 
   def new(
-        id0 \\ UUID.uuid4(),
         id1 \\ nil,
         id2 \\ nil,
         kind \\ :update,
         p1 \\ [],
         v \\ nil,
-        m \\ nil
+        m \\ nil,
+        id0 \\ UUID.uuid4()
       ) do
     %__MODULE__{
       id: id0,
@@ -59,7 +69,7 @@ defmodule Delta.Change do
   def list(did) do
     with {:document, [^did]} <- {:document, Document.id(did)} do
       # Erlang index is 1-based
-      :mnesia.index_read(__MODULE__, did, 2)
+      :mnesia.index_read(__MODULE__, did, 3)
       |> Enum.map(&from_record/1)
     else
       {:document, []} ->
@@ -68,8 +78,17 @@ defmodule Delta.Change do
   end
 
   def list(from, to) do
+    case maybe_id(to) do
+      [to] -> do_list(from, to)
+      _ -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: to})
+    end
+  end
+
+  defp do_list(nil, _), do: []
+  defp do_list(from, to) do
     case get(from) do
-      [%{previous_id: p} = c] -> [c | list(p, to)]
+      [%{id: ^to} = c] -> [c]
+      [%{previous_change_id: p} = c] -> [c | do_list(p, to)]
       [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: from})
     end
   end
@@ -79,21 +98,19 @@ defmodule Delta.Change do
   def list_transaction(from, to), do: :mnesia.transaction(fn -> list(from, to) end)
 
   def write(%{document_id: did, previous_change_id: pid} = m) do
-    :mnesia.transaction(fn ->
-      with {:validate, {:ok, m}} <- {:validate, validate(m)},
-           {:document, [^did]} <- {:document, Document.id(did)},
-           {:previous, [^pid]} <- {:previous, maybe_id(pid)} do
-        super(m)
-      else
-        {:validate, {:error, err}} ->
-          :mnesia.abort(err)
+    with {:validate, {:ok, m}} <- {:validate, validate(m)},
+         {:document, [^did]} <- {:document, Document.id(did)},
+         {:previous, [^pid]} <- {:previous, maybe_id(pid)} do
+      super(m)
+    else
+      {:validate, {:error, err}} ->
+        :mnesia.abort(err)
 
-        {:document, []} ->
-          :mnesia.abort(%DoesNotExist{struct: Document, id: did})
+      {:document, []} ->
+        :mnesia.abort(%DoesNotExist{struct: Document, id: did})
 
-        {:previous, []} ->
-          :mnesia.abort(%DoesNotExist{struct: Change, id: pid})
-      end
-    end)
+      {:previous, []} ->
+        :mnesia.abort(%DoesNotExist{struct: Change, id: pid})
+    end
   end
 end
