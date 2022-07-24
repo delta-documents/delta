@@ -28,17 +28,26 @@ defmodule Delta.Validators do
   def map(%{} = map, _), do: {:ok, map}
   def map(map, err), do: {:error, Map.merge(err, %{expected: "a map", got: "#{inspect(map)}"})}
 
-  def path(p, err \\ %Validation{}) do
-    if Enum.all?(p, fn x -> is_bitstring(x) or is_integer(x) end) and is_list(err) do
+  def path(p, err \\ %Validation{})
+
+  def path(p, err) when is_list(p) do
+    if Enum.all?(p, fn x -> is_bitstring(x) or is_integer(x) end) do
       {:ok, p}
     else
-      {:error, Map.merge(err, %{expected: "a list of strings or integers", got: "inspect(p)"})}
+      {:error, Map.merge(err, %{expected: "a list of strings or integers", got: "#{inspect(p)}"})}
     end
+  end
+
+  def path(p, err) do
+    {:error, Map.merge(err, %{expected: "a list of strings or integers", got: "#{inspect(p)}"})}
   end
 
   @kinds [:add, :update, :remove, :delete]
 
   def kind(kind, err \\ %Validation{})
   def kind(kind, _) when kind in @kinds, do: {:ok, kind}
-  def kind(kind, err), do: {:error, Map.merge(err, %{expected: "to be in #{inspect(@kinds)}", got: "#{inspect(kind)}"})}
+
+  def kind(kind, err) do
+    {:error, Map.merge(err, %{expected: "to be in #{inspect(@kinds)}", got: "#{inspect(kind)}"})}
+  end
 end
