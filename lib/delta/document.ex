@@ -32,8 +32,7 @@ defmodule Delta.Document do
 
   def list(cid) do
     with {:collection, [^cid]} <- {:collection, Collection.id(cid)} do
-      # Erlang index is 1-based
-      :mnesia.index_read(__MODULE__, cid, 2)
+      :mnesia.index_read(__MODULE__, cid, 3)
       |> Enum.map(&from_record/1)
     else
       {:collection, []} ->
@@ -53,17 +52,17 @@ defmodule Delta.Document do
         :mnesia.abort(err)
 
       {:collection, []} ->
-        :mnesia.abort(%DoesNotExist{struct: Collection, id: m})
+        :mnesia.abort(%DoesNotExist{struct: Collection, id: cid})
 
       {:latest_change, []} ->
-        :mnesia.abort(%DoesNotExist{struct: Change, id: m})
+        :mnesia.abort(%DoesNotExist{struct: Change, id: lid})
     end
   end
 
   def delete(m) do
     case id(m) do
       [id] ->
-        :mnesia.index_read(Delta.Change, id, 2)
+        :mnesia.index_read(Delta.Change, id, 3)
         |> Enum.map(&Delta.Change.delete(elem(&1, 1)))
 
         super(id)

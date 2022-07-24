@@ -32,7 +32,7 @@ defmodule Delta.Collection do
   def delete(m) do
     case id(m) do
       [id] ->
-        :mnesia.index_read(Delta.Document, id, 2)
+        :mnesia.index_read(Delta.Document, id, 3)
         |> Enum.map(&Delta.Document.delete(elem(&1, 0)))
 
         super(id)
