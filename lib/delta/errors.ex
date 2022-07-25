@@ -5,9 +5,13 @@ defmodule Delta.Errors do
   defmodule Conflict, do: defstruct([:change_id, :conflicts_with, :message])
 
   def get_struct(%{__struct__: s}), do: s
-  def get_struct(s) when is_atom(s), do: s
+  def get_struct(s), do: s
 
-  def inspect_struct(s), do: s |> get_struct() |> inspect()
+  def inspect_struct(s), do: s |> get_struct() |> inspect_without_nil()
+
+  def inspect_without_nil(nil), do: ""
+  def inspect_without_nil(v), do: inspect(v)
+
   def i_s(s), do: inspect_struct(s)
 
   def maybe_message(string, nil), do: string

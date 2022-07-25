@@ -64,6 +64,13 @@ defmodule Delta.Change do
     end
   end
 
+  def validate(_) do
+    {
+      :error,
+      %Validation{struct: __MODULE__, expected: __MODULE__, got: "not an instance of"}
+    }
+  end
+
   def list(%Document{id: cid}), do: list(cid)
 
   def list(did) do
@@ -85,6 +92,7 @@ defmodule Delta.Change do
   end
 
   defp do_list(nil, _), do: []
+
   defp do_list(from, to) do
     case get(from) do
       [%{id: ^to} = c] -> [c]
@@ -113,4 +121,27 @@ defmodule Delta.Change do
         :mnesia.abort(%DoesNotExist{struct: Change, id: pid})
     end
   end
+
+  def homogenous(changes) when is_list(changes) do
+    mp =
+      changes
+      |> Enum.map(&{&1.previous_change_id, &1})
+      |> Enum.into(%{})
+
+    m =
+      changes
+      |> Enum.map(&{&1.id, &1})
+      |> Enum.into(%{})
+
+    changes
+    |> Enum.filter(fn %{id: id} -> !Map.get(mp, id) end)
+    |> Enum.map(fn l ->
+      l
+      |> do_homogenous(m)
+      |> Enum.reverse()
+    end)
+  end
+
+  defp do_homogenous(%{previous_change_id: p} = leaf, map), do: [leaf | do_homogenous(Map.get(map, p), map)]
+  defp do_homogenous(nil, _), do: []
 end

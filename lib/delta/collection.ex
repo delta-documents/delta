@@ -18,7 +18,7 @@ defmodule Delta.Collection do
   def validate(_) do
     {
       :error,
-      %Validation{struct: __MODULE__, field: :*, expected: __MODULE__, got: "not an instance of"}
+      %Validation{struct: __MODULE__, expected: __MODULE__, got: "not an instance of"}
     }
   end
 

@@ -43,6 +43,8 @@ defmodule DeltaTest.ChangeTest do
                path: %{a: :b}
              }
              |> Change.validate()
+
+    assert {:error, _} = "not a change" |> Change.validate()
   end
 
   test "Delta.Change.new/7 generates unique and correct uuid" do
@@ -101,13 +103,11 @@ defmodule DeltaTest.ChangeTest do
     id3 = UUID.uuid4()
     id = UUID.uuid4()
 
-
     c0 = change()
     c1 = struct(c0, %{id: id1, previous_change_id: c0.id})
     c2 = struct(c0, %{id: id2, previous_change_id: c1.id})
     c3 = struct(c0, %{id: id3, previous_change_id: c2.id})
     c = struct(c0, %{id: id})
-
 
     assert {:aborted, _} = Change.list_transaction(id3, c0.id)
 
@@ -117,9 +117,10 @@ defmodule DeltaTest.ChangeTest do
     assert {:atomic, _} = Change.create_transaction(c3)
     assert {:atomic, _} = Change.create_transaction(c)
 
-    assert {:atomic, [^c3, ^c2]} = Change.list_transaction(id3, c2.id)
-    assert {:atomic, [^c3, ^c2, ^c1, ^c0]} = Change.list_transaction(id3, c0.id)
-    assert {:atomic, [^c3, ^c2, ^c1, ^c0]} = Change.list_transaction(id3, nil)
+    assert {:aborted, _} = Change.list_transaction("not a change", nil)
+    assert {:atomic, [c3, c2]} == Change.list_transaction(id3, c2.id)
+    assert {:atomic, [c3, c2, c1, c0]} == Change.list_transaction(id3, c0.id)
+    assert {:atomic, [c3, c2, c1, c0]} == Change.list_transaction(id3, nil)
   end
 
   test "Delta.Change.create/1 creates change if one does not exist" do
@@ -138,13 +139,13 @@ defmodule DeltaTest.ChangeTest do
     assert {:aborted, _} =
              Change.create_transaction(%Change{id: UUID.uuid4(), document_id: UUID.uuid4()})
 
-    create_document()
     create_collection()
+    create_document()
 
     assert {:aborted, _} =
              Change.create_transaction(%Change{
                id: UUID.uuid4(),
-               document_id: UUID.uuid4(),
+               document_id: document().id,
                previous_change_id: UUID.uuid4()
              })
   end
@@ -167,5 +168,22 @@ defmodule DeltaTest.ChangeTest do
 
   test "Delta.Change.delete/1 of non-existing change is :ok" do
     assert {:atomic, :ok} = Change.delete_transaction("123")
+  end
+
+  test "Delta.Change.homogenous/1 returns homogenous lists of changes" do
+    id1 = UUID.uuid4()
+    id2 = UUID.uuid4()
+    id3 = UUID.uuid4()
+    id = UUID.uuid4()
+
+    c0 = change()
+    c1 = struct(c0, %{id: id1, previous_change_id: c0.id})
+    c2 = struct(c0, %{id: id2, previous_change_id: c1.id})
+    c3 = struct(c0, %{id: id3, previous_change_id: c2.id})
+    c = struct(c0, %{id: id})
+
+    assert [[c0, c1, c2, c3]] == Change.homogenous([c3, c2, c1, c0])
+    assert [[c0, c1, c2, c3]] == Change.homogenous([c0, c1, c2, c3])
+    assert [[c], [c0, c1, c2, c3]] == Change.homogenous([c, c0, c1, c2, c3])
   end
 end

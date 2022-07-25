@@ -24,7 +24,7 @@ defmodule Delta.Document do
   def validate(_) do
     {
       :error,
-      %Validation{struct: __MODULE__, field: :*, expected: __MODULE__, got: "not an instance of"}
+      %Validation{struct: __MODULE__, expected: __MODULE__, got: "not an instance of"}
     }
   end
 
@@ -72,40 +72,17 @@ defmodule Delta.Document do
     end
   end
 
+  def add_changes(document, %Change{} = c), do: add_changes(document, [c])
+
   def add_changes(document, changes) do
-    :mnesia.transaction(fn ->
-      case get_transaction(document) do
-        {:atomic, d} -> do_add_changes(d, changes)
-        {:aborted, reason} -> :mnesia.abort(reason)
-      end
-    end)
-  end
-
-  def do_add_changes(%__MODULE__{latest_change_id: latest_id}, changes),
-    do: do_add_changes(latest_id, changes)
-
-  def do_add_changes(latest_id, [
-        %Change{id: next_id, previous_change_id: latest_id} = change | changes
-      ]) do
-    case Change.create_transaction(change) do
-      {:atomic, _} -> [{:no_conflict, change} | do_add_changes(next_id, changes)]
-      {:aborted, reason} -> :mnesia.abort(reason)
-    end
-  end
-
-  def do_add_changes(latest_id0, [
-        %Change{id: next_id, previous_change_id: latest_id1, path: p} = change | changes
-      ]) do
-    with {:atomic, history} <- Change.list(from: latest_id0, to: latest_id1),
-         {:conflict, :resolvable} <- {:conflict, check_conflict(history, p)},
-         resolved <- Map.put(change, :previous_id, latest_id0),
-         {:atomic, _} <- Change.create_transaction(resolved) do
-      [{:resolved, resolved} | do_add_changes(next_id, changes)]
+    with [d] <- get(document) do
+      do_add_changes(document, changes)
     else
-      {:conflict, %{id: id}} -> :mnesia.abort(%Conflict{change_id: next_id, conflicts_with: id})
-      {_, {:aborted, reason}} -> :mnesia.abort(reason)
+      [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: document})
     end
   end
+
+  def do_add_changes(document, history \\ %{}, changes), do: nil
 
   defp check_conflict(history, path),
     do: Enum.find(history, :resolvable, fn %{path: p} -> Delta.Path.overlap?(path, p) end)

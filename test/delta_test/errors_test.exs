@@ -37,6 +37,7 @@ defmodule DeltaTest.ErrorsTest do
 
   test "Delta.Errors.inspect_struct/1" do
     assert "Delta.Errors.DoesNotExist" == Errors.inspect_struct(DoesNotExist)
+    assert "" == Errors.inspect_struct(nil)
   end
 
   test "Delta.Errors.maybe_message/2" do
