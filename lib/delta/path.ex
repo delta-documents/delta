@@ -39,7 +39,7 @@ defmodule Delta.Path do
   def compile(paths) do
     paths
     |> Enum.map(&Pathex.path(&1, :json))
-    |> Enum.reduce(&Pathex.concat/2)
+    |> Enum.reduce(&Pathex.concat(&2, &1))
   end
 
   @doc """

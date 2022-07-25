@@ -76,10 +76,17 @@ defmodule Delta.Change do
     end
   end
 
-  def apply_change(%Document{data: data} = d, change), do: Map.update!(d, :data, apply_change(data, change))
+  def apply_change(%Document{data: data} = d, change) do
+    with {:ok, applied} <- apply_change(data, change), do: {:ok, Map.put(d, :data, applied)}
+  end
 
   def apply_change(data, %{kind: :update, path: p, value: v}), do: Pathex.force_set(data, Path.compile(p), v)
-  def apply_change(data, %{kind: :delete, path: p, value: _}), do: Pathex.delete(data, Path.compile(p))
+  def apply_change(data, %{kind: :delete, path: p, value: _}) do
+    case Pathex.delete(data, Path.compile(p)) do
+      {:ok, _} = ok -> ok
+      _ -> {:ok, data}
+    end
+  end
 
   def apply_change(data, %{kind: :add, path: p, value: v}) do
     p = Path.compile(p)
@@ -94,7 +101,7 @@ defmodule Delta.Change do
     p = Path.compile(p)
 
     case Pathex.view(data, p) do
-      :error -> data
+      :error -> {:ok, data}
       {:ok, list} when is_list(list) -> Pathex.force_set(data, p, List.delete(list, v))
       {:ok, _} -> Pathex.delete(data, p)
     end

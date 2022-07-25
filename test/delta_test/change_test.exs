@@ -155,4 +155,34 @@ defmodule DeltaTest.ChangeTest do
     assert [[c0, c1, c2, c3]] == Change.homogenous([c0, c1, c2, c3])
     assert [[c], [c0, c1, c2, c3]] == Change.homogenous([c, c0, c1, c2, c3])
   end
+
+  test "Delta.Change.apply_change/2 applies change to any data" do
+    data = %{a: %{b: 1}, b: 1}
+
+    # Update
+    assert {:ok, %{a: %{b: 1}, b: 1, c: 42}} == Change.apply_change(data, %Change{kind: :update, path: [:c], value: 42})
+    assert {:ok, %{a: %{b: 42}, b: 1}} == Change.apply_change(data, %Change{kind: :update, path: [:a, :b], value: 42})
+    assert {:ok, %{a: %{b: 1}, b: 42}} == Change.apply_change(data, %Change{kind: :update, path: [:b], value: 42})
+    assert {:ok, %{a: 42, b: 1}} == Change.apply_change(data, %Change{kind: :update, path: [:a], value: 42})
+    # Delete
+    assert {:ok, %{a: %{b: 1}, b: 1}} = Change.apply_change(data, %Change{kind: :delete, path: [:c], value: 42})
+    assert {:ok, %{a: %{}, b: 1}} == Change.apply_change(data, %Change{kind: :delete, path: [:a, :b]})
+    assert {:ok, %{a: %{b: 1}}} == Change.apply_change(data, %Change{kind: :delete, path: [:b]})
+    assert {:ok, %{b: 1}} == Change.apply_change(data, %Change{kind: :delete, path: [:a]})
+    # Add
+    assert {:ok, %{a: %{b: 1}, b: 1, c: [42]}} == Change.apply_change(data, %Change{kind: :add, path: [:c], value: 42})
+    assert {:ok, %{a: %{b: 42}, b: 1}} == Change.apply_change(data, %Change{kind: :add, path: [:a, :b], value: 42})
+    assert {:ok, %{a: %{b: 1}, b: 42}} == Change.apply_change(data, %Change{kind: :add, path: [:b], value: 42})
+    assert {:ok, %{a: 42, b: 1}} == Change.apply_change(data, %Change{kind: :add, path: [:a], value: 42})
+    # Remove
+    assert {:ok, %{a: %{b: 1}, b: 1}} = Change.apply_change(data, %Change{kind: :remove, path: [:c], value: 42})
+    assert {:ok, %{a: %{}, b: 1}} == Change.apply_change(data, %Change{kind: :remove, path: [:a, :b]})
+    assert {:ok, %{a: %{b: 1}}} == Change.apply_change(data, %Change{kind: :remove, path: [:b]})
+    assert {:ok, %{b: 1}} == Change.apply_change(data, %Change{kind: :remove, path: [:a]})
+    assert {:ok, %{b: [1, 2]}} == Change.apply_change(%{b: [1, 2, 3]}, %Change{kind: :remove, path: [:b], value: 3})
+  end
+
+  test "Delta.Change.apply_change/2 applies change to data in document" do
+    assert {:ok, %{data: %{a: 42}}} = Change.apply_change(document(), %Change{kind: :update, path: [:a], value: 42})
+  end
 end
