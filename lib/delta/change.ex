@@ -13,8 +13,11 @@ defmodule Delta.Change do
 
   use Delta.Storage.MnesiaHelper, struct: Delta.Change
 
+  require Pathex
+
   alias Delta.{Document, Validators}
   alias Delta.Errors.{Validation}
+  alias Delta.Path
 
   def new(
         id1 \\ nil,
@@ -50,7 +53,8 @@ defmodule Delta.Change do
          {:ok, id2} <-
            Validators.maybe_uuid(id2, %Validation{struct: __MODULE__, field: :previous_change_id}),
          {:ok, p1} <- Validators.path(p1, %Validation{struct: __MODULE__, field: :path}),
-         {:ok, kind} <- Validators.kind(kind, %Validation{struct: __MODULE__, field: :kind}) do
+         {:ok, kind} <- Validators.kind(kind, %Validation{struct: __MODULE__, field: :kind}),
+         {:cyclic, false} <- {:cyclic, id0 == id2} do
       {:ok,
        %__MODULE__{
          id: id0,
@@ -61,6 +65,17 @@ defmodule Delta.Change do
          value: v,
          meta: m
        }}
+    else
+      {:cyclic, true} ->
+        %Validation{
+          struct: __MODULE__,
+          field: :previous_change_id,
+          expected: "not to be equal to previous_change_id",
+          got: id0
+        }
+
+      x ->
+        x
     end
   end
 
@@ -122,6 +137,34 @@ defmodule Delta.Change do
     end
   end
 
+  def apply_change(%Document{data: data} = d, change),
+    do: Map.update!(d, :data, apply_change(data, change))
+
+  def apply_change(data, %{kind: :update, path: p, value: v}) do
+    Pathex.force_set(data, Path.compile(p), v)
+  end
+
+  def apply_change(data, %{kind: :delete, path: p, value: _}) do
+    Pathex.delete(data, Path.compile(p))
+  end
+
+  def apply_change(data, %{kind: :add, path: p, value: v}) do
+    p = Path.compile(p)
+    case Pathex.get(data, p, []) do
+      list when is_list(list) -> Pathex.force_set(data, p, [v | list])
+      _ -> Pathex.force_set(data, p, v)
+    end
+  end
+
+  def apply_change(data, %{kind: :remove, path: p, value: v}) do
+    p = Path.compile(p)
+    case Pathex.view(data, p) do
+      :error -> data
+      list when is_list(list) -> Pathex.force_set(data, p, List.delete(list, v))
+      _ -> Pathex.delete(data, p)
+    end
+  end
+
   def homogenous(changes) when is_list(changes) do
     mp =
       changes
@@ -142,6 +185,8 @@ defmodule Delta.Change do
     end)
   end
 
-  defp do_homogenous(%{previous_change_id: p} = leaf, map), do: [leaf | do_homogenous(Map.get(map, p), map)]
+  defp do_homogenous(%{previous_change_id: p} = leaf, map),
+    do: [leaf | do_homogenous(Map.get(map, p), map)]
+
   defp do_homogenous(nil, _), do: []
 end
