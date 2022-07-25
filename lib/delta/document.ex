@@ -70,7 +70,7 @@ defmodule Delta.Document do
 
     h = Change.homogenous(changes)
 
-    case(get_transaction(document)) do
+    case get_transaction(document) do
       {:atomic, document} ->
         :mnesia.lock({:record, __MODULE__, document.id}, :write)
 
@@ -93,7 +93,7 @@ defmodule Delta.Document do
     |> Enum.map(fn [%{previous_change_id: id} | _] -> Change.list(id, latest_id) end)
   end
 
-  def do_add_homogenous_changes(document, history, homogenous_changes) do
+  defp do_add_homogenous_changes(document, history, homogenous_changes) do
     Enum.zip(history, homogenous_changes)
     |> Enum.reduce({document, []}, fn {history, changes}, {document, changes_to_write} ->
       {new_document, c} = do_add_changes(document, history, changes)

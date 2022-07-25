@@ -23,7 +23,7 @@ defmodule Delta.Change do
          {:cyclic, false} <- {:cyclic, id0 == id2} do
       {:ok, %__MODULE__{id: id0, document_id: id1, previous_change_id: id2, kind: kind, path: p1, value: v, meta: m}}
     else
-      {:cyclic, true} -> %Validation{struct: __MODULE__, field: :previous_change_id, expected: "not to be equal to previous_change_id", got: id0}
+      {:cyclic, true} -> %Validation{struct: __MODULE__, field: :previous_change_id, expected: "not to be equal to id", got: id0}
       x -> x
     end
   end
