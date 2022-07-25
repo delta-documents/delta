@@ -27,23 +27,17 @@ alias Delta.Errors.{DoesNotExist, AlreadyExist, Validation, Conflict}
 alias Delta.Errors, as: E
 
 defimpl String.Chars, for: DoesNotExist do
-  def to_string(%{struct: s, id: id, message: m}),
-    do: "#{E.i_s(s)} with id = #{E.get_id(id)} does not exist." |> E.m_m(m)
+  def to_string(%{struct: s, id: id, message: m}), do: "#{E.i_s(s)} with id = #{E.get_id(id)} does not exist." |> E.m_m(m)
 end
 
 defimpl String.Chars, for: AlreadyExist do
-  def to_string(%{struct: s, id: id, message: m}),
-    do: "#{E.i_s(s)} with id = #{E.get_id(id)} already exists." |> E.m_m(m)
+  def to_string(%{struct: s, id: id, message: m}), do: "#{E.i_s(s)} with id = #{E.get_id(id)} already exists." |> E.m_m(m)
 end
 
 defimpl String.Chars, for: Validation do
-  def to_string(%{struct: s, field: f, expected: e, got: g, message: m}),
-    do: "Expected #{E.i_s(s)}.#{f} to be #{e}, got: #{g}." |> E.m_m(m)
+  def to_string(%{struct: s, field: f, expected: e, got: g, message: m}), do: "Expected #{E.i_s(s)}.#{f} to be #{e}, got: #{g}." |> E.m_m(m)
 end
 
 defimpl String.Chars, for: Conflict do
-  def to_string(%{change_id: id0, conflicts_with: id1, message: m}),
-    do:
-      "Delta.Change with id = #{E.get_id(id0)} conflicts with Delta.Change with id = #{E.get_id(id1)}."
-      |> E.m_m(m)
+  def to_string(%{change_id: id0, conflicts_with: id1, message: m}), do: "Delta.Change with id = #{E.get_id(id0)} conflicts with Delta.Change with id = #{E.get_id(id1)}." |> E.m_m(m)
 end

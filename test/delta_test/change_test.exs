@@ -16,34 +16,9 @@ defmodule DeltaTest.ChangeTest do
 
     assert {:error, _} = %Change{id: "not_a_uuid"} |> Change.validate()
     assert {:error, _} = %Change{id: UUID.uuid4(), document_id: "not_a_uuid"} |> Change.validate()
-
-    assert {:error, _} =
-             %Change{
-               id: UUID.uuid4(),
-               document_id: UUID.uuid4(),
-               previous_change_id: "not_a_uuid"
-             }
-             |> Change.validate()
-
-    assert {:error, _} =
-             %Change{
-               id: UUID.uuid4(),
-               document_id: UUID.uuid4(),
-               previous_change_id: UUID.uuid4(),
-               kind: "error"
-             }
-             |> Change.validate()
-
-    assert {:error, _} =
-             %Change{
-               id: UUID.uuid4(),
-               document_id: UUID.uuid4(),
-               previous_change_id: UUID.uuid4(),
-               kind: :update,
-               path: %{a: :b}
-             }
-             |> Change.validate()
-
+    assert {:error, _} = %Change{id: UUID.uuid4(), document_id: UUID.uuid4(), previous_change_id: "not_a_uuid"} |> Change.validate()
+    assert {:error, _} = %Change{id: UUID.uuid4(), document_id: UUID.uuid4(), previous_change_id: UUID.uuid4(), kind: "error"} |> Change.validate()
+    assert {:error, _} = %Change{id: UUID.uuid4(), document_id: UUID.uuid4(), previous_change_id: UUID.uuid4(), kind: :update, path: %{a: :b}} |> Change.validate()
     assert {:error, _} = "not a change" |> Change.validate()
   end
 
@@ -136,18 +111,12 @@ defmodule DeltaTest.ChangeTest do
   test "Delta.Change.create/1 of invalid change aborts transaction" do
     assert {:aborted, _} = Change.create_transaction(%Change{id: 123})
 
-    assert {:aborted, _} =
-             Change.create_transaction(%Change{id: UUID.uuid4(), document_id: UUID.uuid4()})
+    assert {:aborted, _} = Change.create_transaction(%Change{id: UUID.uuid4(), document_id: UUID.uuid4()})
 
     create_collection()
     create_document()
 
-    assert {:aborted, _} =
-             Change.create_transaction(%Change{
-               id: UUID.uuid4(),
-               document_id: document().id,
-               previous_change_id: UUID.uuid4()
-             })
+    assert {:aborted, _} = Change.create_transaction(%Change{id: UUID.uuid4(), document_id: document().id, previous_change_id: UUID.uuid4()})
   end
 
   test "Delta.Change.update/2 updates change if one exists" do

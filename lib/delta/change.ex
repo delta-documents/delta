@@ -1,15 +1,7 @@
 defmodule Delta.Change do
   use Delta.Storage.RecordHelper
 
-  defstruct [
-    :id,
-    :document_id,
-    :previous_change_id,
-    kind: :update,
-    path: [],
-    value: %{},
-    meta: nil
-  ]
+  defstruct [:id, :document_id, :previous_change_id, kind: :update, path: [], value: %{}, meta: nil]
 
   use Delta.Storage.MnesiaHelper, struct: Delta.Change
 
@@ -19,72 +11,24 @@ defmodule Delta.Change do
   alias Delta.Errors.{Validation}
   alias Delta.Path
 
-  def new(
-        id1 \\ nil,
-        id2 \\ nil,
-        kind \\ :update,
-        p1 \\ [],
-        v \\ nil,
-        m \\ nil,
-        id0 \\ UUID.uuid4()
-      ) do
-    %__MODULE__{
-      id: id0,
-      document_id: id1,
-      previous_change_id: id2,
-      kind: kind,
-      path: p1,
-      value: v,
-      meta: m
-    }
-  end
+  def new(id1 \\ nil, id2 \\ nil, kind \\ :update, p1 \\ [], v \\ nil, m \\ nil, id0 \\ UUID.uuid4()),
+    do: %__MODULE__{id: id0, document_id: id1, previous_change_id: id2, kind: kind, path: p1, value: v, meta: m}
 
-  def validate(%__MODULE__{
-        id: id0,
-        document_id: id1,
-        previous_change_id: id2,
-        kind: kind,
-        path: p1,
-        value: v,
-        meta: m
-      }) do
+  def validate(%__MODULE__{id: id0, document_id: id1, previous_change_id: id2, kind: kind, path: p1, value: v, meta: m}) do
     with {:ok, id0} <- Validators.uuid(id0, %Validation{struct: __MODULE__, field: :id}),
          {:ok, id1} <- Validators.uuid(id1, %Validation{struct: __MODULE__, field: :document_id}),
-         {:ok, id2} <-
-           Validators.maybe_uuid(id2, %Validation{struct: __MODULE__, field: :previous_change_id}),
+         {:ok, id2} <- Validators.maybe_uuid(id2, %Validation{struct: __MODULE__, field: :previous_change_id}),
          {:ok, p1} <- Validators.path(p1, %Validation{struct: __MODULE__, field: :path}),
          {:ok, kind} <- Validators.kind(kind, %Validation{struct: __MODULE__, field: :kind}),
          {:cyclic, false} <- {:cyclic, id0 == id2} do
-      {:ok,
-       %__MODULE__{
-         id: id0,
-         document_id: id1,
-         previous_change_id: id2,
-         kind: kind,
-         path: p1,
-         value: v,
-         meta: m
-       }}
+      {:ok, %__MODULE__{id: id0, document_id: id1, previous_change_id: id2, kind: kind, path: p1, value: v, meta: m}}
     else
-      {:cyclic, true} ->
-        %Validation{
-          struct: __MODULE__,
-          field: :previous_change_id,
-          expected: "not to be equal to previous_change_id",
-          got: id0
-        }
-
-      x ->
-        x
+      {:cyclic, true} -> %Validation{struct: __MODULE__, field: :previous_change_id, expected: "not to be equal to previous_change_id", got: id0}
+      x -> x
     end
   end
 
-  def validate(_) do
-    {
-      :error,
-      %Validation{struct: __MODULE__, expected: __MODULE__, got: "not an instance of"}
-    }
-  end
+  def validate(_), do: {:error, %Validation{struct: __MODULE__, expected: __MODULE__, got: "not an instance of"}}
 
   def list(%Document{id: cid}), do: list(cid)
 
@@ -126,30 +70,20 @@ defmodule Delta.Change do
          {:previous, [^pid]} <- {:previous, maybe_id(pid)} do
       super(m)
     else
-      {:validate, {:error, err}} ->
-        :mnesia.abort(err)
-
-      {:document, []} ->
-        :mnesia.abort(%DoesNotExist{struct: Document, id: did})
-
-      {:previous, []} ->
-        :mnesia.abort(%DoesNotExist{struct: Change, id: pid})
+      {:validate, {:error, err}} -> :mnesia.abort(err)
+      {:document, []} -> :mnesia.abort(%DoesNotExist{struct: Document, id: did})
+      {:previous, []} -> :mnesia.abort(%DoesNotExist{struct: Change, id: pid})
     end
   end
 
-  def apply_change(%Document{data: data} = d, change),
-    do: Map.update!(d, :data, apply_change(data, change))
+  def apply_change(%Document{data: data} = d, change), do: Map.update!(d, :data, apply_change(data, change))
 
-  def apply_change(data, %{kind: :update, path: p, value: v}) do
-    Pathex.force_set(data, Path.compile(p), v)
-  end
-
-  def apply_change(data, %{kind: :delete, path: p, value: _}) do
-    Pathex.delete(data, Path.compile(p))
-  end
+  def apply_change(data, %{kind: :update, path: p, value: v}), do: Pathex.force_set(data, Path.compile(p), v)
+  def apply_change(data, %{kind: :delete, path: p, value: _}), do: Pathex.delete(data, Path.compile(p))
 
   def apply_change(data, %{kind: :add, path: p, value: v}) do
     p = Path.compile(p)
+
     case Pathex.get(data, p, []) do
       list when is_list(list) -> Pathex.force_set(data, p, [v | list])
       _ -> Pathex.force_set(data, p, v)
@@ -158,10 +92,11 @@ defmodule Delta.Change do
 
   def apply_change(data, %{kind: :remove, path: p, value: v}) do
     p = Path.compile(p)
+
     case Pathex.view(data, p) do
       :error -> data
-      list when is_list(list) -> Pathex.force_set(data, p, List.delete(list, v))
-      _ -> Pathex.delete(data, p)
+      {:ok, list} when is_list(list) -> Pathex.force_set(data, p, List.delete(list, v))
+      {:ok, _} -> Pathex.delete(data, p)
     end
   end
 

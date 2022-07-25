@@ -3,20 +3,11 @@ defmodule Delta.Validators do
 
   def uuid(id, err \\ %Validation{}) do
     case UUID.info(id) do
-      {:ok, [uuid: u, binary: _, type: :default, version: 4, variant: _]} ->
-        {:ok, u}
-
-      {:ok, [uuid: _, binary: _, type: t, version: 4, variant: _]} ->
-        {:error, Map.merge(err, %{expected: "default UUID", got: "UUID of type #{t}"})}
-
-      {:ok, [uuid: _, binary: _, type: _, version: v, variant: _]} ->
-        {:error, Map.merge(err, %{expected: "UUIDv4", got: "UUIDv#{v}"})}
-
-      {:error, "Invalid argument; Expected: String"} ->
-        {:error, Map.merge(err, %{expected: "UUID", got: "#{inspect(id)}"})}
-
-      {:error, e} ->
-        {:error, Map.merge(err, %{expected: "UUID", got: e})}
+      {:ok, [uuid: u, binary: _, type: :default, version: 4, variant: _]} -> {:ok, u}
+      {:ok, [uuid: _, binary: _, type: t, version: 4, variant: _]} -> {:error, Map.merge(err, %{expected: "default UUID", got: "UUID of type #{t}"})}
+      {:ok, [uuid: _, binary: _, type: _, version: v, variant: _]} -> {:error, Map.merge(err, %{expected: "UUIDv4", got: "UUIDv#{v}"})}
+      {:error, "Invalid argument; Expected: String"} -> {:error, Map.merge(err, %{expected: "UUID", got: "#{inspect(id)}"})}
+      {:error, e} -> {:error, Map.merge(err, %{expected: "UUID", got: e})}
     end
   end
 
@@ -47,7 +38,5 @@ defmodule Delta.Validators do
   def kind(kind, err \\ %Validation{})
   def kind(kind, _) when kind in @kinds, do: {:ok, kind}
 
-  def kind(kind, err) do
-    {:error, Map.merge(err, %{expected: "to be in #{inspect(@kinds)}", got: "#{inspect(kind)}"})}
-  end
+  def kind(kind, err), do: {:error, Map.merge(err, %{expected: "to be in #{inspect(@kinds)}", got: "#{inspect(kind)}"})}
 end

@@ -5,22 +5,13 @@ defmodule Delta.Collection do
 
   alias Delta.Errors.Validation
 
-  def new(name \\ "unnamed_collection", id \\ UUID.uuid4()) do
-    %__MODULE__{id: id, name: name}
-  end
+  def new(name \\ "unnamed_collection", id \\ UUID.uuid4()), do: %__MODULE__{id: id, name: name}
 
   def validate(%__MODULE__{id: id, name: name}) do
-    with {:ok, id} <- Delta.Validators.uuid(id, %Validation{struct: __MODULE__, field: :id}) do
-      {:ok, %__MODULE__{id: id, name: name}}
-    end
+    with {:ok, id} <- Delta.Validators.uuid(id, %Validation{struct: __MODULE__, field: :id}), do: {:ok, %__MODULE__{id: id, name: name}}
   end
 
-  def validate(_) do
-    {
-      :error,
-      %Validation{struct: __MODULE__, expected: __MODULE__, got: "not an instance of"}
-    }
-  end
+  def validate(_), do: {:error, %Validation{struct: __MODULE__, expected: __MODULE__, got: "not an instance of"}}
 
   def write(m) do
     case validate(m) do

@@ -11,9 +11,7 @@ defmodule DeltaTest.DocumentTest do
     assert {:error, _} = %Document{id: "not_a_uuid"} |> Document.validate()
     assert {:error, _} = %Document{id: UUID.uuid4(), collection_id: nil} |> Document.validate()
 
-    assert {:error, _} =
-             %Document{id: UUID.uuid4(), collection_id: UUID.uuid4(), data: nil}
-             |> Document.validate()
+    assert {:error, _} = %Document{id: UUID.uuid4(), collection_id: UUID.uuid4(), data: nil} |> Document.validate()
 
     assert {:error, _} = "not_a_document" |> Document.validate()
   end
@@ -77,17 +75,11 @@ defmodule DeltaTest.DocumentTest do
   test "Delta.Document.create/1 of invalid document aborts transaction" do
     assert {:aborted, _} = Document.create_transaction(%Document{id: 123})
 
-    assert {:aborted, _} =
-             Document.create_transaction(%Document{id: UUID.uuid4(), collection_id: UUID.uuid4()})
+    assert {:aborted, _} = Document.create_transaction(%Document{id: UUID.uuid4(), collection_id: UUID.uuid4()})
 
     create_collection()
 
-    assert {:aborted, _} =
-             Document.create_transaction(%Document{
-               id: UUID.uuid4(),
-               collection_id: collection().id,
-               latest_change_id: UUID.uuid4()
-             })
+    assert {:aborted, _} = Document.create_transaction(%Document{id: UUID.uuid4(), collection_id: collection().id, latest_change_id: UUID.uuid4()})
   end
 
   test "Delta.Document.update/2 updates collection if one exists" do
@@ -118,6 +110,5 @@ defmodule DeltaTest.DocumentTest do
   end
 
   test "Document.add_changes/2 adds changes; resolves conflicts; returns tagged changes" do
-
   end
 end
