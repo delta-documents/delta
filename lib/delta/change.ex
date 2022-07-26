@@ -1,7 +1,7 @@
 defmodule Delta.Change do
   use Delta.Storage.RecordHelper
 
-  defstruct [:id, :document_id, :previous_change_id, kind: :update, path: [], value: %{}, meta: nil]
+  defstruct [:id, :document_id, :previous_change_id, :order, kind: :update, path: [], value: %{}, meta: nil]
 
   use Delta.Storage.MnesiaHelper, struct: Delta.Change
 
@@ -46,7 +46,7 @@ defmodule Delta.Change do
   def list(from, to) do
     case maybe_id(to) do
       [to] -> do_list(from, to)
-      _ -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: to})
+      _ -> []
     end
   end
 
@@ -56,9 +56,11 @@ defmodule Delta.Change do
     case get(from) do
       [%{id: ^to} = c] -> [c]
       [%{previous_change_id: p} = c] -> [c | do_list(p, to)]
-      [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: from})
+      [] -> []
     end
   end
+
+  def history([from | _], to), do: list(from, to)
 
   def list_transaction(document), do: :mnesia.transaction(fn -> list(document) end)
 
@@ -83,6 +85,7 @@ defmodule Delta.Change do
   end
 
   def apply_change(data, %{kind: :update, path: p, value: v}), do: Pathex.force_set(data, Path.compile(p), v)
+
   def apply_change(data, %{kind: :delete, path: p, value: _}) do
     case Pathex.delete(data, Path.compile(p)) do
       {:ok, _} = ok -> ok
@@ -109,28 +112,17 @@ defmodule Delta.Change do
     end
   end
 
-  def homogenous(changes) when is_list(changes) do
-    mp =
-      changes
-      |> Enum.map(&{&1.previous_change_id, &1})
-      |> Enum.into(%{})
+  def homogenous([]), do: []
 
-    m =
-      changes
-      |> Enum.map(&{&1.id, &1})
-      |> Enum.into(%{})
+  def homogenous(changes) do
+    root = root(changes)
 
-    changes
-    |> Enum.filter(fn %{id: id} -> !Map.get(mp, id) end)
-    |> Enum.map(fn l ->
-      l
-      |> do_homogenous(m)
-      |> Enum.reverse()
-    end)
+    [root | changes |> List.delete(root) |> homogenous()]
   end
 
-  defp do_homogenous(%{previous_change_id: p} = leaf, map),
-    do: [leaf | do_homogenous(Map.get(map, p), map)]
+  def root?(%__MODULE__{previous_change_id: id}, changes), do: !Enum.any?(changes, fn %__MODULE__{id: id0} -> id0 == id end)
 
-  defp do_homogenous(nil, _), do: []
+  def root(changes), do: Enum.find(changes, &root?(&1, changes))
+
+  def roots(changes), do: Enum.filter(changes, &root?(&1, changes))
 end

@@ -87,7 +87,7 @@ defmodule DeltaTest.ChangeTest do
     c3 = struct(c0, %{id: id3, previous_change_id: c2.id})
     c = struct(c0, %{id: id})
 
-    assert {:aborted, _} = Change.list_transaction(id3, c0.id)
+    assert {:atomic, []} = Change.list_transaction(id3, c0.id)
 
     assert {:atomic, _} = Change.create_transaction(c0)
     assert {:atomic, _} = Change.create_transaction(c1)
@@ -95,8 +95,9 @@ defmodule DeltaTest.ChangeTest do
     assert {:atomic, _} = Change.create_transaction(c3)
     assert {:atomic, _} = Change.create_transaction(c)
 
-    assert {:aborted, _} = Change.list_transaction("not a change", nil)
+    assert {:atomic, []} = Change.list_transaction("not a change", nil)
     assert {:atomic, [c3, c2]} == Change.list_transaction(id3, c2.id)
+    assert {:atomic, [c3, c2]} == Change.list_transaction(c2.id, id3)
     assert {:atomic, [c3, c2, c1, c0]} == Change.list_transaction(id3, c0.id)
     assert {:atomic, [c3, c2, c1, c0]} == Change.list_transaction(id3, nil)
   end
@@ -142,7 +143,7 @@ defmodule DeltaTest.ChangeTest do
     assert {:atomic, :ok} = Change.delete_transaction("123")
   end
 
-  test "Delta.Change.homogenous/1 returns homogenous lists of changes" do
+  test "Delta.Change.homogenous/1 returns homogenous list of changes" do
     id1 = UUID.uuid4()
     id2 = UUID.uuid4()
     id3 = UUID.uuid4()
@@ -152,11 +153,15 @@ defmodule DeltaTest.ChangeTest do
     c1 = struct(c0, %{id: id1, previous_change_id: c0.id})
     c2 = struct(c0, %{id: id2, previous_change_id: c1.id})
     c3 = struct(c0, %{id: id3, previous_change_id: c2.id})
+    c4 = struct(c0, %{id: id3, previous_change_id: c2.id})
     c = struct(c0, %{id: id})
 
-    assert [[c0, c1, c2, c3]] == Change.homogenous([c3, c2, c1, c0])
-    assert [[c0, c1, c2, c3]] == Change.homogenous([c0, c1, c2, c3])
-    assert [[c], [c0, c1, c2, c3]] == Change.homogenous([c, c0, c1, c2, c3])
+    assert [c0, c1, c2, c3] == Change.homogenous([c3, c2, c1, c0])
+    assert [c0, c1, c2, c3] == Change.homogenous([c0, c1, c2, c3])
+    assert [c, c0, c1, c2, c3] == Change.homogenous([c, c0, c1, c2, c3])
+    assert [c0, c1, c2, c3, c] == Change.homogenous([c0, c1, c2, c3, c])
+    assert [c2, c3, c4] == Change.homogenous([c2, c3, c4])
+    assert [c2, c4, c3] == Change.homogenous([c2, c4, c3])
   end
 
   test "Delta.Change.apply_change/2 applies change to any data" do

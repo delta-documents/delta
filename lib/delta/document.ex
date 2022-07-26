@@ -1,6 +1,6 @@
 defmodule Delta.Document do
   use Delta.Storage.RecordHelper
-  defstruct [:id, :collection_id, :latest_change_id, data: %{}]
+  defstruct [:id, :collection_id, :latest_change_id, change_count: 0, data: %{}]
   use Delta.Storage.MnesiaHelper, struct: Delta.Document
 
   alias Delta.{Change, Validators, Collection}
@@ -71,7 +71,10 @@ defmodule Delta.Document do
           end
         end)
 
-        {document, changes} = do_add_changes(document, history(changes, latest_id), changes)
+        homogenous = Change.homogenous(changes)
+        history = Change.history(changes, latest_id)
+
+        {document, changes} = do_add_changes(document, history, homogenous)
 
         update(document)
         Enum.map(changes, &Delta.Change.create/1)
@@ -81,12 +84,7 @@ defmodule Delta.Document do
     end
   end
 
-  def add_changes_transaction(document, %Change{} = c), do: add_changes_transaction(document, [c])
-  def add_changes_transaction(document, changes) when is_list(changes), do: :mnesia.transaction(fn -> add_changes(document, changes) end)
-
-  defp history([%{previous_change_id: id} | _], latest_id) do
-    Change.list(id, latest_id)
-  end
+  def add_changes_transaction(document, changes), do: :mnesia.transaction(fn -> add_changes(document, changes) end)
 
   defp do_add_changes(document, _, []), do: {document, []}
 
