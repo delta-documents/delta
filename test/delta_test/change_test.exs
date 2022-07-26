@@ -12,13 +12,16 @@ defmodule DeltaTest.ChangeTest do
   end
 
   test "Delta.Change.validate/1" do
+    u = UUID.uuid4()
+
     assert {:ok, _} = change() |> Change.validate()
 
     assert {:error, _} = %Change{id: "not_a_uuid"} |> Change.validate()
-    assert {:error, _} = %Change{id: UUID.uuid4(), document_id: "not_a_uuid"} |> Change.validate()
-    assert {:error, _} = %Change{id: UUID.uuid4(), document_id: UUID.uuid4(), previous_change_id: "not_a_uuid"} |> Change.validate()
-    assert {:error, _} = %Change{id: UUID.uuid4(), document_id: UUID.uuid4(), previous_change_id: UUID.uuid4(), kind: "error"} |> Change.validate()
-    assert {:error, _} = %Change{id: UUID.uuid4(), document_id: UUID.uuid4(), previous_change_id: UUID.uuid4(), kind: :update, path: %{a: :b}} |> Change.validate()
+    assert {:error, _} = %Change{id: u, document_id: "not_a_uuid"} |> Change.validate()
+    assert {:error, _} = %Change{id: u, document_id: u, previous_change_id: "not_a_uuid"} |> Change.validate()
+    assert {:error, _} = %Change{id: u, document_id: u, previous_change_id: UUID.uuid4(), kind: "error"} |> Change.validate()
+    assert {:error, _} = %Change{id: u, document_id: u, previous_change_id: UUID.uuid4(), kind: :update, path: %{a: :b}} |> Change.validate()
+    assert {:error, _} = %Change{id: u, document_id: u, previous_change_id: u, kind: :update, path: ["a", "b"]} |> Change.validate()
     assert {:error, _} = "not a change" |> Change.validate()
   end
 
