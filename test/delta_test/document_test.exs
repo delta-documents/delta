@@ -109,6 +109,51 @@ defmodule DeltaTest.DocumentTest do
     assert {:atomic, :ok} = Document.delete_transaction("123")
   end
 
-  test "Document.add_changes/2 adds changes; resolves conflicts; returns tagged changes" do
+  test "Document.add_changes/2 aborts if document exists or changes are invalid" do
+    c = change()
+    d = document()
+
+    assert {:aborted, _} = Document.add_changes_transaction(d, c)
+
+    create_collection()
+    create_document()
+
+    assert {:aborted, _} = Document.add_changes_transaction(d, %Delta.Change{})
+    assert {:aborted, _} = Document.add_changes_transaction(d, Map.put(c, :document_id, UUID.uuid4()))
+  end
+
+  test "Document.add_changes/2 adds valid changes" do
+    create_collection()
+    create_document()
+
+    assert {:atomic, [change()]} == Document.add_changes_transaction(document(), change())
+  end
+
+  test "Document.add_changes/2 aborts in conflict is unresolvable" do
+    create_collection()
+    create_document()
+
+    id1 = UUID.uuid4()
+    id2 = UUID.uuid4()
+
+    c0 = change()
+    c1 = struct(c0, %{id: id1, previous_change_id: c0.id})
+    c2 = struct(c0, %{id: id2, previous_change_id: c0.id})
+
+    assert {:aborted, %Delta.Errors.Conflict{}} = Document.add_changes_transaction(document(), [c0, c1, c2])
+  end
+
+  test "Document.add_changes/2 resolves conflicts" do
+    create_collection()
+    create_document()
+
+    id1 = UUID.uuid4()
+    id2 = UUID.uuid4()
+
+    c0 = change()
+    c1 = struct(c0, %{id: id1, path: ["a"]})
+    c2 = struct(c0, %{id: id2, path: ["b"]})
+
+    assert {:atomic, [c1, Map.put(c2, :previous_change_id, c1.id)]} == Document.add_changes_transaction(document(), [c1, c2])
   end
 end

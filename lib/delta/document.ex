@@ -59,72 +59,56 @@ defmodule Delta.Document do
 
   def add_changes(document, %Change{} = c), do: add_changes(document, [c])
 
-  def add_changes(%{latest_change_id: lid} = document, changes) do
-    changes
-    |> Enum.each(fn c ->
-      case Change.validate(c) do
-        {:ok, _} -> :ok
-        {:error, err} -> :mnesia.abort(err)
-      end
-    end)
-
-    h = Change.homogenous(changes)
-
+  def add_changes(document, changes) when is_list(changes) do
     case get_transaction(document) do
-      {:atomic, document} ->
-        :mnesia.lock({:record, __MODULE__, document.id}, :write)
+      {:atomic, %{id: document_id, latest_change_id: latest_id} = document} ->
+        changes
+        |> Enum.each(fn c ->
+          case Change.validate(c) do
+            {:ok, %{document_id: ^document_id}} -> :ok
+            {:ok, %{document_id: id}} -> :mnesia.abort(%Validation{struct: Change, field: :document_id, expected: "to be equal to #{document_id}", got: "#{id}"})
+            {:error, err} -> :mnesia.abort(err)
+          end
+        end)
 
-        history = history(h, lid)
-        {document, changes} = do_add_homogenous_changes(document, history, h)
-
-        Enum.map(changes, &Delta.Change.create/1)
+        {document, changes} = do_add_changes(document, history(changes, latest_id), changes)
 
         update(document)
-
-        changes
+        Enum.map(changes, &Delta.Change.create/1)
 
       {:aborted, err} ->
         :mnesia.abort(err)
     end
   end
 
-  defp history(homogenous, latest_id) do
-    homogenous
-    |> Enum.map(fn [%{previous_change_id: id} | _] -> Change.list(id, latest_id) end)
-  end
+  def add_changes_transaction(document, %Change{} = c), do: add_changes_transaction(document, [c])
+  def add_changes_transaction(document, changes) when is_list(changes), do: :mnesia.transaction(fn -> add_changes(document, changes) end)
 
-  defp do_add_homogenous_changes(document, history, homogenous_changes) do
-    Enum.zip(history, homogenous_changes)
-    |> Enum.reduce({document, []}, fn {history, changes}, {document, changes_to_write} ->
-      {new_document, c} = do_add_changes(document, history, changes)
-      {new_document, c ++ changes_to_write}
-    end)
+  defp history([%{previous_change_id: id} | _], latest_id) do
+    Change.list(id, latest_id)
   end
 
   defp do_add_changes(document, _, []), do: {document, []}
 
-  defp do_add_changes(document, [%{id: id} | _] = history, [%{previous_change_id: id} = c | changes]) do
-    c = Change.write(c)
-    document = Change.apply_change(document, c)
+  defp do_add_changes(%{latest_change_id: id} = document, history, [%{previous_change_id: id} = c | changes]) do
+    case Change.apply_change(document, c) do
+      {:ok, document} ->
+        {document, changes} = do_add_changes(document, [c | history], changes)
+        {document, [c | changes]}
 
-    {document, changes} = do_add_changes(document, [c | history], changes)
-    {document, [c | changes]}
-  end
-
-  defp do_add_changes(document, history, [%{path: p} = c | changes]) do
-    case check_conflict(history, p) do
-      :resolvable -> resolve(document, history, c, changes)
-      %{id: conflicts_with} -> :mnesia.abort(%Conflict{change_id: c.id, conflicts_with: conflicts_with})
+      {:error, err} ->
+        :mnesia.abort(err)
     end
   end
 
-  defp resolve(document, [%{id: id} | _] = history, c, changes) do
-    c = Map.update!(c, :previous_change_id, id)
-    c = Change.write(c)
-    document = Change.apply_change(document, c)
+  defp do_add_changes(%{latest_change_id: id} = document, history, [%{path: path} = c | changes]) do
+    case check_conflict(history, path) do
+      :resolvable ->
+        do_add_changes(document, history, [Map.put(c, :previous_change_id, id) | changes])
 
-    {document, changes} = do_add_changes(document, [c | history], changes)
-    {document, [c | changes]}
+      %{id: conflicts_with} ->
+        :mnesia.abort(%Conflict{change_id: c.id, conflicts_with: conflicts_with})
+    end
   end
 
   defp check_conflict(history, path), do: Enum.find(history, :resolvable, fn %{path: p} -> Delta.Path.overlap?(path, p) end)

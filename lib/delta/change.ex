@@ -76,8 +76,10 @@ defmodule Delta.Change do
     end
   end
 
-  def apply_change(%Document{data: data} = d, change) do
-    with {:ok, applied} <- apply_change(data, change), do: {:ok, Map.put(d, :data, applied)}
+  def apply_change(%Document{data: data} = d, %{id: id} = change) do
+    with {:ok, applied} <- apply_change(data, change) do
+      {:ok, struct(d, %{data: applied, latest_change_id: id})}
+    end
   end
 
   def apply_change(data, %{kind: :update, path: p, value: v}), do: Pathex.force_set(data, Path.compile(p), v)
