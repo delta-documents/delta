@@ -24,7 +24,8 @@ defmodule Delta.MixProject do
     [
       {:uuid, "~> 1.1"},
       {:pathex, "~> 2.1", runtime: false},
-      {:nimble_parsec, "~> 1.2"}
+      {:nimble_parsec, "~> 1.2", runtime: false},
+      {:phoenix_pubsub, "~> 2.1"}
     ]
   end
 end
