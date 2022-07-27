@@ -43,24 +43,38 @@ defmodule Delta.Change do
     end
   end
 
+  def list(from, nil) do
+    with [%{document_id: doc_id, order: f}] <- get(from) do
+      list_matchspec(doc_id, f, 1)
+      |> Enum.flat_map(&:mnesia.match_object/1)
+      |> Enum.map(&from_record/1)
+    end
+  end
+
   def list(from, to) do
-    case maybe_id(to) do
-      [to] -> do_list(from, to)
-      _ -> []
+    with [%{document_id: doc_id, order: f}] <- get(from),
+         [%{document_id: ^doc_id, order: t}] <- get(to) do
+      list_matchspec(doc_id, f, t)
+      |> Enum.flat_map(&:mnesia.match_object/1)
+      |> Enum.map(&from_record/1)
     end
   end
 
-  defp do_list(nil, _), do: []
-
-  defp do_list(from, to) do
-    case get(from) do
-      [%{id: ^to} = c] -> [c]
-      [%{previous_change_id: p} = c] -> [c | do_list(p, to)]
-      [] -> []
-    end
+  defp list_matchspec(doc_id, from, to) do
+    Enum.map((from || 1)..(to || 1), &{Delta.Change, :_, doc_id, :_, &1, :_, :_, :_, :_})
   end
 
-  def history([from | _], to), do: list(from, to)
+  def history(from, to) do
+    case Enum.flat_map(from, &get/1) do
+      [] ->
+        []
+
+      x ->
+        x
+        |> Enum.min_by(fn %{order: o} -> o end)
+        |> list(to)
+    end
+  end
 
   def list_transaction(document), do: :mnesia.transaction(fn -> list(document) end)
 
@@ -71,9 +85,9 @@ defmodule Delta.Change do
          {:exists, []} <- {:exists, get(m)},
          {:document, [%{id: ^did, change_count: count}]} <- {:document, Document.get(did)},
          {:previous, [^pid]} <- {:previous, maybe_id(pid)},
-         m <- struct(m, %{order: count + 1}),
+         m <- struct(m, order: count + 1),
          :ok <- :mnesia.write(to_record(m)),
-         Document.update(did, %{change_count: count + 1})do
+         Document.update(did, %{change_count: count + 1}) do
       m
     else
       {:validate, {:error, err}} -> :mnesia.abort(err)
@@ -97,7 +111,7 @@ defmodule Delta.Change do
 
   def apply_change(%Document{data: data} = d, %{id: id} = change) do
     with {:ok, applied} <- apply_change(data, change) do
-      {:ok, struct(d, %{data: applied, latest_change_id: id})}
+      {:ok, struct(d, data: applied, latest_change_id: id)}
     end
   end
 

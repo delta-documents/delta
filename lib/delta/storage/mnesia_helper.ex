@@ -38,7 +38,6 @@ defmodule Delta.Storage.MnesiaHelper do
 
       def update(m, attrs \\ %{}) do
         case get(m) do
-          [_] when is_struct(m, __MODULE__) -> if Enum.empty?(attrs), do: write(m), else: write(struct(m, attrs))
           [m] -> if Enum.empty?(attrs), do: write(m), else: write(struct(m, attrs))
           [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: m.id})
         end

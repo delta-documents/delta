@@ -33,8 +33,8 @@ defmodule DeltaTest.DocumentTest do
     create_collection()
     create_document()
 
-    assert {:atomic, ^d} = Document.get_transaction(d.id)
-    assert {:atomic, ^d} = Document.get_transaction(d)
+    assert {:atomic, d} == Document.get_transaction(d.id)
+    assert {:atomic, d} == Document.get_transaction(d)
   end
 
   test "Delta.Document.list/0" do
@@ -45,7 +45,7 @@ defmodule DeltaTest.DocumentTest do
     create_collection()
     create_document()
 
-    assert {:atomic, [^d]} = Document.list_transaction()
+    assert {:atomic, [d]} == Document.list_transaction()
   end
 
   test "Delta.Document.list/1 lists documents in collection" do
@@ -60,15 +60,15 @@ defmodule DeltaTest.DocumentTest do
 
     create_document()
 
-    assert {:atomic, [^d]} = Document.list_transaction(c)
-    assert {:atomic, [^d]} = Document.list_transaction(c.id)
+    assert {:atomic, [d]} == Document.list_transaction(c)
+    assert {:atomic, [d]} == Document.list_transaction(c.id)
   end
 
   test "Delta.Document.create/1 creates document if one does not exist" do
     d = document()
     create_collection()
 
-    assert {:atomic, ^d} = Document.create_transaction(d)
+    assert {:atomic, d} == Document.create_transaction(d)
     assert {:aborted, _} = Document.create_transaction(d)
   end
 
@@ -126,7 +126,7 @@ defmodule DeltaTest.DocumentTest do
     create_collection()
     create_document()
 
-    assert {:atomic, [change()]} == Document.add_changes_transaction(document(), change())
+    assert {:atomic, [struct(change(), order: 1)]} == Document.add_changes_transaction(document(), change())
   end
 
   test "Document.add_changes/2 aborts in conflict is unresolvable" do
@@ -137,8 +137,8 @@ defmodule DeltaTest.DocumentTest do
     id2 = UUID.uuid4()
 
     c0 = change()
-    c1 = struct(c0, %{id: id1, previous_change_id: c0.id})
-    c2 = struct(c0, %{id: id2, previous_change_id: c0.id})
+    c1 = struct(c0, id: id1, previous_change_id: c0.id)
+    c2 = struct(c0, id: id2, previous_change_id: c0.id)
 
     assert {:aborted, %Delta.Errors.Conflict{}} = Document.add_changes_transaction(document(), [c0, c1, c2])
   end
@@ -154,6 +154,6 @@ defmodule DeltaTest.DocumentTest do
     c1 = struct(c0, %{id: id1, path: ["a"]})
     c2 = struct(c0, %{id: id2, path: ["b"]})
 
-    assert {:atomic, [c1, Map.put(c2, :previous_change_id, c1.id)]} == Document.add_changes_transaction(document(), [c1, c2])
+    assert {:atomic, [struct(c1, order: 1), struct(c2, previous_change_id: c1.id, order: 2)]} == Document.add_changes_transaction(document(), [c1, c2])
   end
 end

@@ -72,12 +72,17 @@ defmodule Delta.Document do
         end)
 
         homogenous = Change.homogenous(changes)
-        history = Change.history(changes, latest_id)
+        history =
+          changes
+          |> Change.roots()
+          |> Change.history(latest_id)
 
-        {document, changes} = do_add_changes(document, history, homogenous)
+        {%{data: data, latest_change_id: latest_id}, changes} = do_add_changes(document, history, homogenous)
 
-        update(document)
-        Enum.map(changes, &Delta.Change.create/1)
+        changes = Enum.map(changes, &Delta.Change.create/1)
+        update(document_id, %{data: data, latest_change_id: latest_id})
+
+        changes
 
       {:aborted, err} ->
         :mnesia.abort(err)
@@ -91,7 +96,7 @@ defmodule Delta.Document do
   defp do_add_changes(%{latest_change_id: id} = document, history, [%{previous_change_id: id} = c | changes]) do
     case Change.apply_change(document, c) do
       {:ok, document} ->
-        {document, changes} = do_add_changes(document, [c | history], changes)
+        {document, changes} = do_add_changes(document, history ++ [c], changes)
         {document, [c | changes]}
 
       {:error, err} ->
@@ -99,8 +104,8 @@ defmodule Delta.Document do
     end
   end
 
-  defp do_add_changes(%{latest_change_id: id} = document, history, [%{path: path} = c | changes]) do
-    case check_conflict(history, path) do
+  defp do_add_changes(%{latest_change_id: id} = document, history, [c | changes]) do
+    case check_conflict(history, c) do
       :resolvable ->
         do_add_changes(document, history, [Map.put(c, :previous_change_id, id) | changes])
 
@@ -109,5 +114,9 @@ defmodule Delta.Document do
     end
   end
 
-  defp check_conflict(history, path), do: Enum.find(history, :resolvable, fn %{path: p} -> Delta.Path.overlap?(path, p) end)
+  defp check_conflict(history, %{path: path, previous_change_id: id}) do
+    history
+    |> Enum.drop_while(fn %{id: id0} -> id0 != id end)
+    |> Enum.find(:resolvable, fn %{path: p} -> Delta.Path.overlap?(path, p) end)
+  end
 end

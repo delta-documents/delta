@@ -35,29 +35,29 @@ defmodule DeltaTest.ChangeTest do
   end
 
   test "Delta.Change.get/1" do
-    c = change()
+    c = struct(change(), order: 1)
 
     assert {:aborted, _} = Change.get_transaction(c)
 
     create()
 
-    assert {:atomic, ^c} = Change.get_transaction(c.id)
-    assert {:atomic, ^c} = Change.get_transaction(c)
+    assert {:atomic, c} == Change.get_transaction(c.id)
+    assert {:atomic, c} == Change.get_transaction(c)
   end
 
   test "Delta.Change.list/0" do
-    c = change()
+    c = struct(change(), order: 1)
 
     assert {:atomic, []} = Change.list_transaction()
 
     create()
 
-    assert {:atomic, [^c]} = Change.list_transaction()
+    assert {:atomic, [c]} == Change.list_transaction()
   end
 
   test "Delta.Change.list/1 lists changes of a document" do
     d = document()
-    c = change()
+    c = struct(change(), order: 1)
 
     assert {:aborted, _} = Change.list_transaction(d)
 
@@ -68,8 +68,8 @@ defmodule DeltaTest.ChangeTest do
 
     create_change()
 
-    assert {:atomic, [^c]} = Change.list_transaction(d.id)
-    assert {:atomic, [^c]} = Change.list_transaction(d)
+    assert {:atomic, [c]} == Change.list_transaction(d.id)
+    assert {:atomic, [c]} == Change.list_transaction(d)
   end
 
   test "Delta.Change.list/2 lists changes from one to another" do
@@ -82,22 +82,22 @@ defmodule DeltaTest.ChangeTest do
     id = UUID.uuid4()
 
     c0 = change()
-    c1 = struct(c0, %{id: id1, previous_change_id: c0.id})
-    c2 = struct(c0, %{id: id2, previous_change_id: c1.id})
-    c3 = struct(c0, %{id: id3, previous_change_id: c2.id})
-    c = struct(c0, %{id: id})
+    c1 = struct(c0, id: id1, previous_change_id: c0.id)
+    c2 = struct(c0, id: id2, previous_change_id: c1.id)
+    c3 = struct(c0, id: id3, previous_change_id: c2.id)
+    c = struct(c0, id: id)
 
     assert {:atomic, []} = Change.list_transaction(id3, c0.id)
 
-    assert {:atomic, _} = Change.create_transaction(c0)
-    assert {:atomic, _} = Change.create_transaction(c1)
-    assert {:atomic, _} = Change.create_transaction(c2)
-    assert {:atomic, _} = Change.create_transaction(c3)
+    assert {:atomic, c0} = Change.create_transaction(c0)
+    assert {:atomic, c1} = Change.create_transaction(c1)
+    assert {:atomic, c2} = Change.create_transaction(c2)
+    assert {:atomic, c3} = Change.create_transaction(c3)
     assert {:atomic, _} = Change.create_transaction(c)
 
     assert {:atomic, []} = Change.list_transaction("not a change", nil)
     assert {:atomic, [c3, c2]} == Change.list_transaction(id3, c2.id)
-    assert {:atomic, [c3, c2]} == Change.list_transaction(c2.id, id3)
+    assert {:atomic, [c2, c3]} == Change.list_transaction(c2.id, id3)
     assert {:atomic, [c3, c2, c1, c0]} == Change.list_transaction(id3, c0.id)
     assert {:atomic, [c3, c2, c1, c0]} == Change.list_transaction(id3, nil)
   end
@@ -108,7 +108,7 @@ defmodule DeltaTest.ChangeTest do
     create_collection()
     create_document()
 
-    assert {:atomic, ^c} = Change.create_transaction(c)
+    assert {:atomic, struct(c, order: 1)} == Change.create_transaction(c)
     assert {:aborted, _} = Change.create_transaction(c)
   end
 
@@ -150,11 +150,11 @@ defmodule DeltaTest.ChangeTest do
     id = UUID.uuid4()
 
     c0 = change()
-    c1 = struct(c0, %{id: id1, previous_change_id: c0.id})
-    c2 = struct(c0, %{id: id2, previous_change_id: c1.id})
-    c3 = struct(c0, %{id: id3, previous_change_id: c2.id})
-    c4 = struct(c0, %{id: id3, previous_change_id: c2.id})
-    c = struct(c0, %{id: id})
+    c1 = struct(c0, id: id1, previous_change_id: c0.id)
+    c2 = struct(c0, id: id2, previous_change_id: c1.id)
+    c3 = struct(c0, id: id3, previous_change_id: c2.id)
+    c4 = struct(c0, id: id3, previous_change_id: c2.id)
+    c = struct(c0, id: id)
 
     assert [c0, c1, c2, c3] == Change.homogenous([c3, c2, c1, c0])
     assert [c0, c1, c2, c3] == Change.homogenous([c0, c1, c2, c3])

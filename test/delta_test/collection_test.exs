@@ -17,8 +17,8 @@ defmodule DeltaTest.CollectionTest do
     c2 = %{id: id2} = Collection.new()
 
     assert id1 != id2
-    assert {:ok, ^c1} = Collection.validate(c1)
-    assert {:ok, ^c2} = Collection.validate(c2)
+    assert {:ok, c1} == Collection.validate(c1)
+    assert {:ok, c2} == Collection.validate(c2)
   end
 
   test "Delta.Collection.get/1" do
@@ -28,8 +28,8 @@ defmodule DeltaTest.CollectionTest do
 
     create_collection()
 
-    assert {:atomic, ^c} = Collection.get_transaction(c.id)
-    assert {:atomic, ^c} = Collection.get_transaction(c)
+    assert {:atomic, c} == Collection.get_transaction(c.id)
+    assert {:atomic, c} == Collection.get_transaction(c)
   end
 
   test "Delta.Collection.list/0" do
@@ -39,12 +39,12 @@ defmodule DeltaTest.CollectionTest do
 
     create_collection()
 
-    assert {:atomic, [^c]} = Collection.list_transaction()
+    assert {:atomic, [c]} == Collection.list_transaction()
   end
 
   test "Delta.Collection.create/1 creates collection if one does not exist" do
     c = collection()
-    assert {:atomic, ^c} = Collection.create_transaction(c)
+    assert {:atomic, c} == Collection.create_transaction(c)
     assert {:aborted, _} = Collection.create_transaction(c)
   end
 

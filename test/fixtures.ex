@@ -19,7 +19,7 @@ defmodule Fixtures do
     previous_change_id: nil,
     kind: :update,
     path: [],
-    value: nil,
+    value: %{},
     meta: nil
   }
 
