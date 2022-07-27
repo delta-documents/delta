@@ -38,7 +38,8 @@ defmodule Delta.Storage.MnesiaHelper do
 
       def update(m, attrs \\ %{}) do
         case get(m) do
-          [m] -> write(struct(m, attrs))
+          [_] when is_struct(m, __MODULE__) -> if Enum.empty?(attrs), do: write(m), else: write(struct(m, attrs))
+          [m] -> if Enum.empty?(attrs), do: write(m), else: write(struct(m, attrs))
           [] -> :mnesia.abort(%DoesNotExist{struct: __MODULE__, id: m.id})
         end
       end
@@ -91,6 +92,7 @@ defmodule Delta.Storage.MnesiaHelper do
         foldl: 2,
         foldr: 2,
         get: 1,
+        create: 1,
         write: 1,
         delete: 1,
         id: 1,
@@ -98,7 +100,6 @@ defmodule Delta.Storage.MnesiaHelper do
         list_transaction: 0,
         get_transaction: 1,
         create_transaction: 1,
-        update_transaction: 1,
         update_transaction: 2,
         delete_transaction: 1
       )

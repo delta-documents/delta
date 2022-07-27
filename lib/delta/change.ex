@@ -66,6 +66,23 @@ defmodule Delta.Change do
 
   def list_transaction(from, to), do: :mnesia.transaction(fn -> list(from, to) end)
 
+  def create(%{document_id: did, previous_change_id: pid} = m) do
+    with {:validate, {:ok, m}} <- {:validate, validate(m)},
+         {:exists, []} <- {:exists, get(m)},
+         {:document, [%{id: ^did, change_count: count}]} <- {:document, Document.get(did)},
+         {:previous, [^pid]} <- {:previous, maybe_id(pid)},
+         m <- struct(m, %{order: count + 1}),
+         :ok <- :mnesia.write(to_record(m)),
+         Document.update(did, %{change_count: count + 1})do
+      m
+    else
+      {:validate, {:error, err}} -> :mnesia.abort(err)
+      {:document, []} -> :mnesia.abort(%DoesNotExist{struct: Document, id: did})
+      {:previous, []} -> :mnesia.abort(%DoesNotExist{struct: Change, id: pid})
+      {:exists, [_]} -> :mnesia.abort(%AlreadyExist{struct: __MODULE__, id: m.id})
+    end
+  end
+
   def write(%{document_id: did, previous_change_id: pid} = m) do
     with {:validate, {:ok, m}} <- {:validate, validate(m)},
          {:document, [^did]} <- {:document, Document.id(did)},

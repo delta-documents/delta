@@ -8,12 +8,12 @@ defmodule Delta.Document do
 
   def new(d \\ %{}, id1 \\ nil, id2 \\ nil, id0 \\ UUID.uuid4()), do: %__MODULE__{id: id0, collection_id: id1, latest_change_id: id2, data: d}
 
-  def validate(%__MODULE__{id: id0, collection_id: id1, latest_change_id: id2, data: d}) do
+  def validate(%__MODULE__{id: id0, collection_id: id1, latest_change_id: id2, change_count: c, data: d}) do
     with {:ok, id0} <- Validators.uuid(id0, %Validation{struct: __MODULE__, field: :id}),
          {:ok, id1} <- Validators.uuid(id1, %Validation{struct: __MODULE__, field: :collection_id}),
          {:ok, id2} <- Validators.maybe_uuid(id2, %Validation{struct: __MODULE__, field: :latest_change_id}),
          {:ok, d} <- Validators.map(d, %Validation{struct: __MODULE__, field: :data}) do
-      {:ok, %__MODULE__{id: id0, collection_id: id1, latest_change_id: id2, data: d}}
+      {:ok, %__MODULE__{id: id0, collection_id: id1, latest_change_id: id2, change_count: c, data: d}}
     end
   end
 
