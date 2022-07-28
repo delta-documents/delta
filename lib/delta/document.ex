@@ -63,7 +63,7 @@ defmodule Delta.Document do
     case get_transaction(document) do
       {:atomic, %{id: document_id, latest_change_id: latest_id} = document} ->
         changes
-        |> Enum.each(fn c ->
+        |> Enum.map(fn c ->
           case Change.validate(c) do
             {:ok, %{document_id: ^document_id}} -> :ok
             {:ok, %{document_id: id}} -> :mnesia.abort(%Validation{struct: Change, field: :document_id, expected: "to be equal to #{document_id}", got: "#{id}"})
@@ -82,6 +82,7 @@ defmodule Delta.Document do
         changes = Enum.map(changes, &Delta.Change.create/1)
         update(document_id, %{data: data, latest_change_id: latest_id})
 
+        Enum.map(changes, &Phoenix.PubSub.broadcast(Delta.Event, document_id, &1))
         changes
 
       {:aborted, err} ->
