@@ -10,7 +10,7 @@ defmodule Delta.Application do
     children = [
       # Starts a worker by calling: Delta.Worker.start_link(arg)
       # {Delta.Worker, arg}
-      {Phoenix.PubSub, name: Delta.Events.PubSub}
+      {Phoenix.PubSub, name: Delta.Event.PubSub, dispatcher: Delta.Event.Dispatcher}
     ]
 
     Delta.Storage.migrate()
