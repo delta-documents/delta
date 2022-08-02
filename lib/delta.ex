@@ -13,7 +13,7 @@ defmodule Delta do
   def update_document(document, attrs \\ %{}), do: Document.update_transaction(document, attrs)
   def delete_document(document), do: Document.delete_transaction(document)
 
-  def add_changes_to_document(document, changes), do: Document.add_changes(document, changes)
+  def add_changes_to_document(document, changes), do: Document.add_changes_transaction(document, changes)
 
   # def subscribe_document(%Delta.Document{id: id}), do: subscribe_document(id)
   # def subscribe_document(document_id), do: Delta.Event.subscribe("#{Delta.Document}", %{id: document_id})
