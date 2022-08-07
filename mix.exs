@@ -1,3 +1,4 @@
+
 defmodule Delta.MixProject do
   use Mix.Project
 
@@ -14,7 +15,7 @@ defmodule Delta.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger, :mnesia],
+      extra_applications: [:logger, :os_mon, :mnesia],
       mod: {Delta.Application, []}
     ]
   end

@@ -1,4 +1,7 @@
 defmodule Delta.Storage do
+
+  @type t :: module()
+
   def migrate(nodes \\ [node()]) do
     :rpc.multicall(nodes, Application, :stop, [:mnesia])
 
