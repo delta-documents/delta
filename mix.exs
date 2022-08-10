@@ -23,9 +23,11 @@ defmodule Delta.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:uuid, "~> 1.1"},
+      {:benchee, "~> 1.1", only: :bench},
+      {:benchee_html, "~> 1.0", only: :bench},
       {:pathex, "~> 2.1", runtime: false},
       {:nimble_parsec, "~> 1.2", runtime: false},
+      {:uuid, "~> 1.1"},
       {:phoenix_pubsub, "~> 2.1"}
     ]
   end
