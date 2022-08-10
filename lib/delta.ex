@@ -1,6 +1,6 @@
 defmodule Delta do
   @moduledoc """
-  External Delta API
+  Delta Elixir API
   """
 
   @type uuid4() :: bitstring()
