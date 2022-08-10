@@ -101,6 +101,12 @@ Benchee.run(
   %{
     "lookup" => fn input -> Enum.map(input, &MnesiaShardedBench.lookup/1) end,
     "lookup_sharded" => fn input -> Enum.map(input, &MnesiaShardedBench.lookup_sharded/1) end,
+  },
+  opts ++ [inputs: %{"keys" => keys}]
+)
+
+Benchee.run(
+  %{
     "first" => fn input -> Enum.map(input, &MnesiaShardedBench.first/1) end,
     "first_sharded" => fn input -> Enum.map(input, &MnesiaShardedBench.first_sharded/1) end
   },
