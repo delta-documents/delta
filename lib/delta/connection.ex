@@ -4,6 +4,7 @@ defmodule Delta.Connection do
   Instances is expected to:
     - manage connection from user
     - join Swarm group `Delta.Connection` to be able to recieve notifications
+    - to handle notificatons asyncronously
   """
 
   @typedoc """
@@ -20,5 +21,11 @@ defmodule Delta.Connection do
           | {:added, Delta.Commit.t()}
           | {:squashed, into :: Delta.Commit.t(), Delta.Commit.t()}
 
-  @callback handle_call({:notify, document_id :: Delta.uuid4(), event()}, any(), any()) :: :ok
+  @callback handle_call({:notify, event()}, any(), any()) :: {:reply, :ok, any()}
+
+  @doc """
+  Sends event to every connection
+  """
+  @spec notify(event()) :: [:ok]
+  def notify(event), do: Swarm.multi_call(__MODULE__, event, 100)
 end
