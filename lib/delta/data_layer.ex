@@ -3,7 +3,9 @@ defmodule Delta.DataLayer do
   Behaviour of Delta Data Layers.
 
   *Data layer* is a GenServer, managing operations with entites associated with document.
-  Each instance is expected to control its uniuqe portion of data.
+  Each instance is expected to:
+    - control its uniuqe portion of data.
+    - join Swarm group `Delta.DataLayer` for proper layer_id form resolution
   """
 
   @typedoc """
@@ -22,19 +24,25 @@ defmodule Delta.DataLayer do
   @type continuation :: (layer_id() -> any()) | nil
 
   @doc """
-  Starts *data layer* for isolating any data related to document.
+  Starts *data layer* for isolating any data related to document
   """
-  @callback start_link(document_id :: Delta.Document.t() | Delta.uuid4(), opts :: keyword()) :: {:ok, pid} | {:error, any()}
+  @callback start_link(document_id :: Delta.Document.t() | Delta.uuid4(), opts :: keyword()) ::
+              {:ok, pid} | {:error, any()}
 
   @doc """
-  Performs all required actions for *data layer* to be available on all nodes in list.
+  Performs all required actions for *data layer* to be available on all nodes in list
   """
   @callback replicate(nodes :: [node()]) :: :ok
 
   @doc """
-  Returns function that should be called on process which monitors *data layer*.
+  Returns function that should be called on process which monitors *data layer*
   """
   @callback crash_handler(layer_id()) :: fun()
+
+  @doc """
+  Runs continuation on *data layer*
+  """
+  @callback handle_call({:continue, continuation()}) :: any()
 
   @doc """
   Runs continuation on data layer with `layer_id`.
@@ -43,26 +51,32 @@ defmodule Delta.DataLayer do
   def continue(_, nil), do: nil
 
   def continue(layer_id, continuation) do
-    pid = layer_id_to_pid(layer_id)
+    pid = layer_id_pid(layer_id)
 
     GenServer.call(pid, {:continue, continuation})
   end
 
   @doc """
-  Gets pid of GenServer, responsible for instance of a data layer
+  Converts `layer_id` to pid form
   """
-  @spec layer_id_to_pid(layer_id()) :: pid()
-  def layer_id_to_pid(pid) when is_pid(pid), do: pid
-  def layer_id_to_pid(layer_id) do
-
-  end
+  @spec layer_id_pid(layer_id()) :: pid()
+  def layer_id_pid(pid) when is_pid(pid), do: pid
+  def layer_id_pid({mod, %Delta.Document{id: id}}), do: layer_id_pid({mod, id})
+  def layer_id_pid({_mod, _id} = layer_id), do: Swarm.whereis_name(layer_id)
 
   @doc """
-  Gets layer_id from by pid of GenServer managing it
+  Converts `layer_id` to normal form
   """
+  @spec layer_id_normal(layer_id()) :: layer_id()
+  def layer_id_normal({mod, %Delta.Document{id: id}}), do: {mod, id}
+  def layer_id_normal({_mod, _id} = layer_id), do: layer_id
 
-  @spec pid_to_layer_id(pid()) :: layer_id()
-  def pid_to_layer_id(pid) do
+  def layer_id_normal(pid) when is_pid(pid) do
+    {name, _} =
+      __MODULE__
+      |> Swarm.members()
+      |> Enum.find(fn {_, p} -> p == pid end)
 
+    name
   end
 end

@@ -12,14 +12,17 @@ defmodule Delta.DataLayer.CrashHandler do
 
   @spec add(Delta.DataLayer.layer_id()) :: :ok
   def add(layer_id) do
-    pid = data_layer.layer_id_to_pid(layer_id)
+    {data_layer, _} = Delta.DataLayer.layer_id_normal(layer_id)
+
+    pid = Delta.DataLayer.layer_id_pid(layer_id)
     fun = data_layer.crash_handler(layer_id)
+
     GenServer.cast(__MODULE__, {:add, pid, fun})
   end
 
   @spec remove(Delta.DataLayer.layer_id()) :: :ok
   def remove(layer_id) do
-    pid = data_layer.layer_id_to_pid(layer_id)
+    pid = Delta.DataLayer.layer_id_pid(layer_id)
     GenServer.cast(__MODULE__, {:remove, pid})
   end
 

@@ -15,16 +15,15 @@ defmodule Delta.Commit.CacheLayer do
   end
 
   @impl GenServer
-  def init(args) do
-    {:ok, args}
+  def init(%{document_id: id} = state) do
+    Swarm.register_name({__MODULE__, id}, self())
+    Swarm.join(Delta.DataLayer, self())
+    
+    {:ok, state}
   end
 
   @impl Delta.DataLayer
   def replicate(_nodes), do: :ok
-
-  @impl Delta.DataLayer
-  def layer_id_to_pid(pid) when is_pid(pid), do: pid
-  def layer_id_to_pid(_), do: nil
 
   @impl Delta.DataLayer
   def crash_handler(_layer_id), do: fn -> IO.inspect(:crash_handler) end
