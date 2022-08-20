@@ -42,7 +42,7 @@ defmodule Delta.DataLayer do
   @doc """
   Runs continuation on *data layer*
   """
-  @callback handle_call({:continue, continuation()}) :: any()
+  @callback handle_call({:continue, continuation()}, any(), any()) :: any()
 
   @doc """
   Runs continuation on data layer with `layer_id`.

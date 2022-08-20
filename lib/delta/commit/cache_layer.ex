@@ -18,8 +18,15 @@ defmodule Delta.Commit.CacheLayer do
   def init(%{document_id: id} = state) do
     Swarm.register_name({__MODULE__, id}, self())
     Swarm.join(Delta.DataLayer, self())
-    
+
     {:ok, state}
+  end
+
+  @impl true
+  def handle_call({:continue, continuation}, _from, state) do
+    layer_id = self()
+
+    {:reply, continuation.(layer_id), state}
   end
 
   @impl Delta.DataLayer
