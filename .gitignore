@@ -4,6 +4,12 @@
 # If you run "mix test --cover", coverage assets end up here.
 /cover/
 
+# Becnhcmarks reports
+/bench/**/*.css
+/bench/**/*.js
+/bench/**/*.html
+/bench/**/*.txt
+
 # The directory Mix downloads your dependencies sources to.
 /deps/
 
@@ -26,4 +32,3 @@ delta-*.tar
 /tmp/
 
 /data/
-/test/nonode@nohost/
