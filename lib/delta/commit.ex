@@ -17,7 +17,7 @@ defmodule Delta.Commit do
     - `:meta` – any metadata, e. g. user who made it
     - `:updated_at` – when the commit was updated.
   """
-  @type t :: %__MODULE__{
+  @type t() :: %__MODULE__{
           id: Delta.uuid4(),
           previous_commit_id: Delta.uuid4(),
           document_id: Delta.uuid4(),
@@ -28,6 +28,8 @@ defmodule Delta.Commit do
           meta: any,
           updated_at: DateTime.t()
         }
+
+  @type id() :: Delta.uuid4() | t()
 
   defstruct [
     :id,
@@ -58,8 +60,8 @@ defmodule Delta.Commit do
 
   Aborts if document with `id = document_id` does not exist.
   """
-  @spec list(Delta.Document.t() | Delta.uuid4()) ::
-          {:atomic, [t]} | {:aborted, Delta.Errors.DoesNotExist.t()}
+  @spec list(Delta.Document.id()) ::
+          {:atomic, [t()]} | {:aborted, Delta.Errors.DoesNotExist.t()}
 
   def list(document_id), do: nil
 
@@ -68,12 +70,12 @@ defmodule Delta.Commit do
 
   Aborts with `%Delta.Errors.DoesNotExist{}` if commit with `id = from_commit_id` or `id = to_commit_id` does not exist.
   """
-  @spec list(t() | Delta.uuid4(), t() | Delta.uuid4()) ::
-          {:atomic, [t]} | {:aborted, Delta.Errors.DoesNotExist.t()}
+  @spec list(id(), id()) ::
+          {:atomic, [t()]} | {:aborted, Delta.Errors.DoesNotExist.t()}
 
   def list(from_commit_id, to_commit_id), do: nil
 
-  @spec get(t() | Delta.uuid4()) :: {:atomic, t} | {:aborted, Delta.Errors.DoesNotExist.t()}
+  @spec get(id()) :: {:atomic, t()} | {:aborted, Delta.Errors.DoesNotExist.t()}
   def get(commit_id), do: nil
 
   @doc """
@@ -85,8 +87,8 @@ defmodule Delta.Commit do
 
   Aborts with `%Delta.Errors.AlreadyExists{}` if commit with `id = commit.id` already exists.
   """
-  @spec create(t() | Delta.uuid4()) ::
-          {:atomic, t} | {:aborted, Delta.Errors.DoesNotExist.t() | Delta.Errors.AlreadyExist.t()}
+  @spec create(t()) ::
+          {:atomic, t()} | {:aborted, Delta.Errors.DoesNotExist.t() | Delta.Errors.AlreadyExist.t()}
 
   def create(commit), do: nil
 
@@ -98,7 +100,7 @@ defmodule Delta.Commit do
   or document with `id = commit.document_id`
   or commit with `id = commit.id` does not exist.
   """
-  @spec update(t() | Delta.uuid4()) :: {:atomic, t} | {:aborted, Delta.Errors.DoesNotExist.t()}
+  @spec update(id(), map() | keyword()) :: {:atomic, t()} | {:aborted, Delta.Errors.DoesNotExist.t()}
   def update(commit, attrs \\ []), do: nil
 
   @doc """
@@ -107,14 +109,14 @@ defmodule Delta.Commit do
 
   Aborts with `%Delta.Errors.DoesNotExist{}` if commit with `id = commit_id_1` or `id = commit_id_2` does not exist.
   """
-  @spec squash(t() | Delta.uuid4(), t | Delta.uuid4()) ::
-          {:atomic, t} | {:aborted, Delta.Errors.DoesNotExist.t()}
+  @spec squash(id(), id()) ::
+          {:atomic, t()} | {:aborted, Delta.Errors.DoesNotExist.t()}
   def squash(commit_id_1, commit_id_2), do: nil
 
   @doc """
   Deletes commit with `id = commit_id`.
   Returns {:atomic, :ok} even if commit with `id = commit_id` does not exist.
   """
-  @spec delete(t() | Delta.uuid4()) :: {:atomic, :ok}
+  @spec delete(id()) :: {:atomic, :ok}
   def delete(change_id), do: nil
 end

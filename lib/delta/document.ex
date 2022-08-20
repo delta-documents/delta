@@ -10,6 +10,8 @@ defmodule Delta.Document do
           updated_at: DateTime.t()
         }
 
+  @type id() :: Delta.uuid4() | t()
+
   @type collection() :: String.t()
 
   defstruct [:id, :collection, :data, :updated_at]
@@ -32,7 +34,7 @@ defmodule Delta.Document do
   @spec list(collection()) :: {:atomic, [t()]} | {:aborted, reason :: any()}
   def list(collection), do: nil
 
-  @spec get(t() | Delta.uuid4()) :: {:atomic, t()} | {:aborted, Delta.Errors.DoesNotExist.t()}
+  @spec get(id()) :: {:atomic, t()} | {:aborted, Delta.Errors.DoesNotExist.t()}
   def get(document_id), do: nil
 
   @doc """
@@ -48,7 +50,7 @@ defmodule Delta.Document do
 
   Aborts with `%Delta.Errors.DoesNotExist{}` if document with `id = document.id` does not exist.
   """
-  @spec update(t() | Delta.uuid4(), keyword() | map()) ::
+  @spec update(id(), map() | keyword()) ::
           {:atomic, t()} | {:aborted, Delta.Errors.DoesNotExist.t()}
   def update(document_id, attrs \\ []), do: nil
 
@@ -56,7 +58,7 @@ defmodule Delta.Document do
   Deletes document and its changes with `id = document_id`.
   Reutrns {:atomic, :ok} even if document with `id = document_id` does not exist.
   """
-  @spec delete(t() | Delta.uuid4()) :: {:atomic, :ok} | {:aborted, reason :: any()}
+  @spec delete(id()) :: {:atomic, :ok} | {:aborted, reason :: any()}
   def delete(document_id), do: nil
 
   @doc """
@@ -68,7 +70,7 @@ defmodule Delta.Document do
 
   Aborts with `%Delta.Errors.DoesNotExist{}` if document with `id = document_id` does not exist.
   """
-  @spec add_changes(t() | Delta.uuid4(), [Delta.Change.t()]) ::
+  @spec add_changes(id(), [Delta.Change.t()]) ::
           {:atomic, [Delta.Change.t()]}
           | {:aborted, Delta.Errors.DoesNotExist.t() | Delta.Errors.Conflict.t()}
   def add_changes(document_id, changes), do: nil
