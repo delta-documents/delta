@@ -6,6 +6,11 @@ defmodule Delta.DataLayer do
   Each instance is expected to control its uniuqe portion of data.
   """
 
+  @typedoc """
+  Identifier for layer instance, canbe either `pid()` of DataLayer process, `Delta.uuid4()` of document (or `Delta.Document.t()`, from which the id will be extracted)
+  """
+  @type layer_id :: pid() | Delta.uuid4() | Delta.Document.t()
+
   @doc """
   Starts *data layer* for isolating any data related to document.
   """
@@ -17,33 +22,33 @@ defmodule Delta.DataLayer do
    - no operations after starting graceful stop will be performed
    - all auxiilary data will be cleaned.
   """
-  @callback graceful_stop(pid()) :: :ok
+  @callback graceful_stop(layer_id()) :: :ok
 
   @doc """
   Reads data from instance of *data layer*.
   """
-  @callback read(pid(), any()) :: {:atomic, any()} | {:aborted, any()}
+  @callback read(layer_id(), any()) :: {:atomic, any()} | {:aborted, any()}
 
   @doc """
   Writes data to instance of *data layer*.
   """
-  @callback write(pid(), any()) :: :ok | {:atomic, any()} | {:aborted, any()}
+  @callback write(layer_id(), any()) :: :ok | {:atomic, any()} | {:aborted, any()}
 
   @doc """
   Asks *data layer* to free some memory.
   """
-  @callback dump(pid()) :: :ok
+  @callback dump(layer_id()) :: :ok
 
   @doc """
   Deletes data from instance of *data layer*.
   """
-  @callback delete(pid(), any()) :: :ok | {:atomic, any()} | {:aborted, any()}
+  @callback delete(layer_id(), any()) :: :ok | {:atomic, any()} | {:aborted, any()}
 
   @doc """
   Returns true if data on particular *data layer* exists.
   """
 
-  @callback exists?(pid(), any()) :: boolean()
+  @callback exists?(layer_id(), any()) :: boolean()
 
   @doc """
   Performs all required actions for *data layer* to be available on all nodes in list.
@@ -53,5 +58,5 @@ defmodule Delta.DataLayer do
   @doc """
   Returns function that should be called on process which monitors *data layer*.
   """
-  @callback crash_handler(pid()) :: function()
+  @callback crash_handler(layer_id()) :: function()
 end
