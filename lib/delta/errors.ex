@@ -1,25 +1,52 @@
 defmodule Delta.Errors do
-  defmodule DoesNotExist, do: defstruct([:struct, :id, :message])
-  defmodule AlreadyExist, do: defstruct([:struct, :id, :message])
-  defmodule Validation, do: defstruct([:struct, :field, :expected, :got, :message])
-  defmodule Conflict, do: defstruct([:change_id, :conflicts_with, :message])
+  @moduledoc """
+  Helpers for working with errors
+  """
 
+  defmodule DoesNotExist do
+    @type t() :: %__MODULE__{struct: module(), id: Delta.uuid4(), message: String.t()}
+    defstruct([:struct, :id, :message])
+  end
+
+  defmodule AlreadyExist do
+    @type t() :: %__MODULE__{struct: module(), id: Delta.uuid4(), message: String.t()}
+    defstruct([:struct, :id, :message])
+  end
+
+  defmodule Validation do
+    @type t() :: %__MODULE__{struct: module(), field: atom(), got: any(), message: String.t()}
+    defstruct([:struct, :field, :expected, :got, :message])
+  end
+
+  defmodule Conflict do
+    @type t() :: %__MODULE__{change_id: Delta.uuid4(), conflicts_with: Delta.uuid4(), message: String.t()}
+    defstruct([:change_id, :conflicts_with, :message])
+  end
+
+
+  @doc false
   def get_struct(%{__struct__: s}), do: s
   def get_struct(s), do: s
 
+  @doc false
   def inspect_struct(s), do: s |> get_struct() |> inspect_without_nil()
 
+  @doc false
   def inspect_without_nil(nil), do: ""
   def inspect_without_nil(v), do: inspect(v)
 
+  @doc false
   def i_s(s), do: inspect_struct(s)
 
+  @doc false
   def maybe_message(string, nil), do: string
   def maybe_message(string, msg), do: "#{string} #{msg}"
 
+  @doc false
   def get_id(%{id: id}), do: id
   def get_id(id), do: id
 
+  @doc false
   def m_m(s, m), do: maybe_message(s, m)
 end
 

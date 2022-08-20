@@ -1,123 +1,75 @@
 defmodule Delta.Document do
-  use Delta.Storage.RecordHelper
-  defstruct [:id, :collection_id, :latest_change_id, change_count: 0, data: %{}]
-  use Delta.Storage.MnesiaHelper, struct: Delta.Document
+  @moduledoc """
+  Internal API for working with documents
+  """
 
-  alias Delta.{Change, Validators, Collection}
-  alias Delta.Errors.{Validation, Conflict}
+  @type t() :: %__MODULE__{
+          id: Delta.uuid4(),
+          collection: String.t(),
+          data: any(),
+          updated_at: DateTime.t()
+        }
 
-  def new(d \\ %{}, id1 \\ nil, id2 \\ nil, id0 \\ UUID.uuid4()), do: %__MODULE__{id: id0, collection_id: id1, latest_change_id: id2, data: d}
+  @type collection() :: String.t()
 
-  def validate(%__MODULE__{id: id0, collection_id: id1, latest_change_id: id2, change_count: c, data: d}) do
-    with {:ok, id0} <- Validators.uuid(id0, %Validation{struct: __MODULE__, field: :id}),
-         {:ok, id1} <- Validators.uuid(id1, %Validation{struct: __MODULE__, field: :collection_id}),
-         {:ok, id2} <- Validators.maybe_uuid(id2, %Validation{struct: __MODULE__, field: :latest_change_id}),
-         {:ok, d} <- Validators.map(d, %Validation{struct: __MODULE__, field: :data}) do
-      {:ok, %__MODULE__{id: id0, collection_id: id1, latest_change_id: id2, change_count: c, data: d}}
-    end
-  end
+  defstruct [:id, :collection, :data, :updated_at]
 
-  def validate(_), do: {:error, %Validation{struct: __MODULE__, expected: __MODULE__, got: "not an instance of"}}
+  @doc """
+  Validates `document.id` to be UUIDv4 in default form
+  """
+  @spec validate(t()) :: {:atomic, t()} | {:aborted, Delta.Errors.Validation.t()}
+  def validate(document), do: nil
 
-  def list(%Collection{id: cid}), do: list(cid)
+  @doc """
+  Returns ids of all documents for efficiency reasons
+  """
+  @spec list() :: {:atomic, [Delta.uuid4()]} | {:aborted, reason :: any()}
+  def list(), do: nil
 
-  def list(cid) do
-    with {:collection, [^cid]} <- {:collection, Collection.id(cid)} do
-      :mnesia.index_read(__MODULE__, cid, 3)
-      |> Enum.map(&from_record/1)
-    else
-      {:collection, []} -> :mnesia.abort(%DoesNotExist{struct: Collection, id: cid})
-    end
-  end
+  @doc """
+  Returns ids of all documents in collection for efficiency reasons
+  """
+  @spec list(collection()) :: {:atomic, [t()]} | {:aborted, reason :: any()}
+  def list(collection), do: nil
 
-  def list_transaction(collection), do: :mnesia.transaction(fn -> list(collection) end)
+  @spec get(t() | Delta.uuid4()) :: {:atomic, t()} | {:aborted, Delta.Errors.DoesNotExist.t()}
+  def get(document_id), do: nil
 
-  def write(%{collection_id: cid, latest_change_id: lid} = m) do
-    with {:validate, {:ok, m}} <- {:validate, validate(m)},
-         {:collection, [^cid]} <- {:collection, Collection.id(cid)},
-         {:latest_change, [^lid]} <- {:latest_change, Change.maybe_id(lid)} do
-      super(m)
-    else
-      {:validate, {:error, err}} -> :mnesia.abort(err)
-      {:collection, []} -> :mnesia.abort(%DoesNotExist{struct: Collection, id: cid})
-      {:latest_change, []} -> :mnesia.abort(%DoesNotExist{struct: Change, id: lid})
-    end
-  end
+  @doc """
+  Creates document.
 
-  def delete(m) do
-    case id(m) do
-      [id] ->
-        :mnesia.index_read(Change, id, 3)
-        |> Enum.map(&Change.delete(elem(&1, 1)))
+  Aborts with `%Delta.Errors.AlreadyExists{}` if document with `id = document.id` already exist.
+  """
+  @spec create(t()) :: {:atomic, t()} | {:aborted, Delta.Errors.AlreadyExists.t()}
+  def create(document), do: nil
 
-        super(id)
+  @doc """
+  Updates document.
 
-      _ ->
-        :ok
-    end
-  end
+  Aborts with `%Delta.Errors.DoesNotExist{}` if document with `id = document.id` does not exist.
+  """
+  @spec update(t() | Delta.uuid4(), keyword() | map()) ::
+          {:atomic, t()} | {:aborted, Delta.Errors.DoesNotExist.t()}
+  def update(document_id, attrs \\ []), do: nil
 
-  def add_changes(document, %Change{} = c), do: add_changes(document, [c])
+  @doc """
+  Deletes document and its changes with `id = document_id`.
+  Reutrns {:atomic, :ok} even if document with `id = document_id` does not exist.
+  """
+  @spec delete(t() | Delta.uuid4()) :: {:atomic, :ok} | {:aborted, reason :: any()}
+  def delete(document_id), do: nil
 
-  def add_changes(document, changes) when is_list(changes) do
-    case get_transaction(document) do
-      {:atomic, %{id: document_id, latest_change_id: latest_id} = document} ->
-        changes
-        |> Enum.map(fn c ->
-          case Change.validate(c) do
-            {:ok, %{document_id: ^document_id}} -> :ok
-            {:ok, %{document_id: id}} -> :mnesia.abort(%Validation{struct: Change, field: :document_id, expected: "to be equal to #{document_id}", got: "#{id}"})
-            {:error, err} -> :mnesia.abort(err)
-          end
-        end)
+  @doc """
+  Adds list of changes `changes` to document with `id = document_id` in transactional manner.
 
-        homogenous = Change.homogenous(changes)
-        history =
-          changes
-          |> Change.roots()
-          |> Change.history(latest_id)
+  Aborts with `%Delta.Errors.Conflict{}`
+  if `changes` do not form linear history
+  or one or more changes conflict with existing changes.
 
-        {%{data: data, latest_change_id: latest_id}, changes} = do_add_changes(document, history, homogenous)
-
-        changes = Enum.map(changes, &Delta.Change.create/1)
-        update(document_id, %{data: data, latest_change_id: latest_id})
-
-        Enum.map(changes, &Phoenix.PubSub.broadcast(Delta.Event, document_id, &1))
-        changes
-
-      {:aborted, err} ->
-        :mnesia.abort(err)
-    end
-  end
-
-  def add_changes_transaction(document, changes), do: :mnesia.transaction(fn -> add_changes(document, changes) end)
-
-  defp do_add_changes(document, _, []), do: {document, []}
-
-  defp do_add_changes(%{latest_change_id: id} = document, history, [%{previous_change_id: id} = c | changes]) do
-    case Change.apply_change(document, c) do
-      {:ok, document} ->
-        {document, changes} = do_add_changes(document, history ++ [c], changes)
-        {document, [c | changes]}
-
-      {:error, err} ->
-        :mnesia.abort(err)
-    end
-  end
-
-  defp do_add_changes(%{latest_change_id: id} = document, history, [c | changes]) do
-    case check_conflict(history, c) do
-      :resolvable ->
-        do_add_changes(document, history, [Map.put(c, :previous_change_id, id) | changes])
-
-      %{id: conflicts_with} ->
-        :mnesia.abort(%Conflict{change_id: c.id, conflicts_with: conflicts_with})
-    end
-  end
-
-  defp check_conflict(history, %{path: path, previous_change_id: id}) do
-    history
-    |> Enum.drop_while(fn %{id: id0} -> id0 != id end)
-    |> Enum.find(:resolvable, fn %{path: p} -> Delta.Path.overlap?(path, p) end)
-  end
+  Aborts with `%Delta.Errors.DoesNotExist{}` if document with `id = document_id` does not exist.
+  """
+  @spec add_changes(t() | Delta.uuid4(), [Delta.Change.t()]) ::
+          {:atomic, [Delta.Change.t()]}
+          | {:aborted, Delta.Errors.DoesNotExist.t() | Delta.Errors.Conflict.t()}
+  def add_changes(document_id, changes), do: nil
 end

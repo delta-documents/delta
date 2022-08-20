@@ -1,4 +1,3 @@
-
 defmodule Delta.MixProject do
   use Mix.Project
 
@@ -23,9 +22,11 @@ defmodule Delta.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:uuid, "~> 1.1"},
-      {:pathex, "~> 2.1", runtime: false},
+      {:benchee, "~> 1.1", only: :bench},
+      {:benchee_html, "~> 1.0", only: :bench},
       {:nimble_parsec, "~> 1.2", runtime: false},
+      {:mongodb_driver, "~> 0.9.0"},
+      {:uuid, "~> 1.1"},
       {:phoenix_pubsub, "~> 2.1"}
     ]
   end
