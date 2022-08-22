@@ -5,7 +5,7 @@ defmodule Delta.DataLayer do
   *Data layer* is a GenServer, managing operations with entites associated with document.
   Each instance is expected to:
     - control its uniuqe portion of data.
-    - join Swarm group `Delta.DataLayer` for proper layer_id form resolution
+    - join Swarm group `Delta.DataLayer` for proper layer_id form resolution.
   """
 
   @typedoc """
@@ -14,35 +14,35 @@ defmodule Delta.DataLayer do
     - `pid()` of data layer process
     - `{module(), Delta.Document.t()}` – same as normal form, but id will be extracted from a document.
 
-  Note that any `Delta.uuid4()` is valid id in type context, in other words, there is no checks if document exists to be performed
+  Note that any `Delta.uuid4()` is valid id in type context, in other words, there is no checks if document exists to be performed.
   """
   @type layer_id :: {module(), Delta.uuid4()} | pid() | {module(), Delta.Document.t()}
 
   @typedoc """
-  Specifies operation continuation on another data layer. Is executed on data layer with `layer_id`
+  Specifies operation continuation on another data layer. Is executed on data layer with `layer_id`.
   """
   @type continuation :: (layer_id() -> any()) | nil
 
   @doc """
-  Starts *data layer* for isolating any data related to document
+  Starts *data layer* for isolating any data related to document.
   """
   @callback start_link(document_id :: Delta.Document.t() | Delta.uuid4(), opts :: keyword()) ::
               {:ok, pid} | {:error, any()}
 
   @doc """
-  Performs all required actions for *data layer* to be available on all nodes in list
+  Performs all required actions for *data layer* to be available on all nodes in list.
   """
   @callback replicate(nodes :: [node()]) :: :ok
 
   @doc """
-  Returns function that should be called on process which monitors *data layer*
+  Returns function that should be called on process which monitors *data layer*.
   """
-  @callback crash_handler(layer_id()) :: fun()
+  @callback crash_handler(any()) :: fun()
 
   @doc """
-  Runs continuation on *data layer*
+  Runs continuation on *data layer*.
   """
-  @callback handle_call({:continue, continuation()}, any(), any()) :: any()
+  @callback continue(layer_id(), continuation()) :: any()
 
   @doc """
   Runs continuation on data layer with `layer_id`.
@@ -51,13 +51,13 @@ defmodule Delta.DataLayer do
   def continue(_, nil), do: nil
 
   def continue(layer_id, continuation) do
-    pid = layer_id_pid(layer_id)
+    {m, _} = layer_id_normal(layer_id)
 
-    GenServer.call(pid, {:continue, continuation})
+    m.continue(layer_id, continuation)
   end
 
   @doc """
-  Converts `layer_id` to pid form
+  Converts `layer_id` to pid form.
   """
   @spec layer_id_pid(layer_id()) :: pid()
   def layer_id_pid(pid) when is_pid(pid), do: pid
@@ -65,7 +65,7 @@ defmodule Delta.DataLayer do
   def layer_id_pid({_mod, _id} = layer_id), do: Swarm.whereis_name(layer_id)
 
   @doc """
-  Converts `layer_id` to normal form
+  Converts `layer_id` to normal form.
   """
   @spec layer_id_normal(layer_id()) :: layer_id()
   def layer_id_normal({mod, %Delta.Document{id: id}}), do: {mod, id}
