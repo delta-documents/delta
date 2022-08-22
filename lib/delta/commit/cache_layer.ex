@@ -1,37 +1,77 @@
 defmodule Delta.Commit.CacheLayer do
-  @behaviour Delta.DataLayer
+  require Logger
   use GenServer
 
-  defstruct [:document_id, :table, :write_timeout]
+  alias Delta.DataLayer
 
-  @impl Delta.DataLayer
-  def start_link(document_id, opts \\ []) do
-    write_timeout = Keyword.get(opts, :write_timeout, 5_000)
-    table = :"#{__MODULE__}.document_id"
+  @behaviour DataLayer
+
+  @moduledoc """
+  Caching layer for Delta.Commit
+  """
+
+  defstruct [:document_id, :table]
+
+  @impl DataLayer
+  def start_link(document_id, _ \\ nil) do
+    table = :"#{__MODULE__}.#{document_id}"
 
     GenServer.start_link(__MODULE__, [
-      %__MODULE__{document_id: document_id, table: table, write_timeout: write_timeout}
+      %__MODULE__{document_id: document_id, table: table}
     ])
   end
 
+  @impl DataLayer
+  def replicate(_nodes), do: :ok
+
+  @impl DataLayer
+  def crash_handler(state) do
+    fn ->
+      Logger.log(:error, "#{__MODULE__} crashed: #{state}")
+    end
+  end
+
+  @impl DataLayer
+  def continue(layer_id, continuation) do
+    GenServer.call(DataLayer.layer_id_pid(layer_id), continuation)
+  end
+
   @impl GenServer
-  def init(%{document_id: id} = state) do
+  def init(%{document_id: id, table: table} = state) do
     Swarm.register_name({__MODULE__, id}, self())
-    Swarm.join(Delta.DataLayer, self())
+    Swarm.join(DataLayer, self())
+
+    DataLayer.CrashHandler.add(self(), crash_handler(state))
+
+    :mnesia.create_table(table,
+      attributes: [
+        :order,
+        :id,
+        :previous_commit_id,
+        :autosquash?,
+        :delta,
+        :reverse_delta,
+        :meta,
+        :updated_at
+      ],
+      index: [:id, :previous_commit_id],
+      disc_copies: [node()]
+    )
 
     {:ok, state}
   end
 
-  @impl true
+  @impl GenServer
   def handle_call({:continue, continuation}, _from, state) do
     layer_id = self()
 
     {:reply, continuation.(layer_id), state}
   end
 
-  @impl Delta.DataLayer
-  def replicate(_nodes), do: :ok
+  @spec table(DataLayer.layer_id()) :: :mnesia.table()
+  def table(layer_id) do
+    {__MODULE__, document_id} = DataLayer.layer_id_normal(layer_id)
 
-  @impl Delta.DataLayer
-  def crash_handler(_layer_id), do: fn -> IO.inspect(:crash_handler) end
+    :"#{__MODULE__}.#{document_id}"
+  end
 end
