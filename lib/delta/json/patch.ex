@@ -79,6 +79,32 @@ defmodule Delta.Json.Patch do
     end
   end
 
+  @doc """
+  Joins two patches together
+  """
+  @spec squash(t(), t()) :: t()
+  def squash(patch1, patch2) do
+    normalize(patch1 ++ patch2)
+  end
+
+  @doc """
+  If a paths of two operations are the same, keeps the last one
+  """
+  @spec normalize(t()) :: t()
+  def normalize(patch), do: do_normalize(Enum.with_index(patch), %{})
+
+  defp do_normalize([{{:add,    p, _}, _} = op | rest], m), do: do_normalize(rest, Map.put(m, p, op))
+  defp do_normalize([{{:remove, p   }, _} = op | rest], m), do: do_normalize(rest, Map.put(m, p, op))
+  defp do_normalize([{{:move,   p, _}, _} = op | rest], m), do: do_normalize(rest, Map.put(m, p, op))
+  defp do_normalize([{{:copy,   p, _}, _} = op | rest], m), do: do_normalize(rest, Map.put(m, p, op))
+
+  defp do_normalize([], m) do
+    m
+    |> Enum.sort_by(fn {_, {_, i}} -> i end)
+    |> Enum.map(fn {_, {op, _}} -> op end)
+  end
+
+
   defp parse_path({:remove, path}) do
     with {:ok, path} <- Delta.Json.Pointer.parse(path) do
       {:remove, path}
