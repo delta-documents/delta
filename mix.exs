@@ -24,7 +24,7 @@ defmodule Delta.MixProject do
     [
       {:benchee, "~> 1.1", only: :bench},
       {:benchee_html, "~> 1.0", only: :bench},
-      {:nimble_parsec, "~> 1.2", runtime: false},
+      {:jason, "~> 1.3"},
       {:swarm, "~> 3.4"},
       {:mongodb_driver, "~> 0.9.0"},
       {:uuid, "~> 1.1"},
