@@ -140,12 +140,17 @@ defmodule Delta.Commit.CacheApi do
     {status, result, nil}
   end
 
-  def write(layer_id, commit, true) do
+  def write({CacheLayer, document_id} = layer_id, commit, true) do
     table = table(layer_id)
 
-    {status, result} = :mnesia.transaction(write_transaction(table, commit))
-
-    {status, result, nil}
+    with {:atomic, result} <- :mnesia.transaction(write_transaction(table, commit)) do
+      id = Commit.id(result)
+      {:atomic, result, fn {mod, ^document_id} = l ->
+        with {:atomic, result, _} <- get(layer_id, id, false), do: mod.write(l, result, false)
+      end}
+    else
+      {status, result} -> {status, result, nil}
+    end
   end
 
   defp write_transaction(table, commit) do
@@ -189,7 +194,6 @@ defmodule Delta.Commit.CacheApi do
   end
 
   def do_squash() do
-    
   end
 
   defp from_record(
