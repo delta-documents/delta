@@ -1,7 +1,15 @@
 defmodule Delta.DataLayer.CrashHandler do
+  @moduledoc """
+  Runs anonymous function on data layer exit
+  """
+
   require Logger
   use GenServer
 
+  @doc """
+  Starts crash handler process with name `Delta.DataLayer.CrashHandler`.
+  API assumes that process is named.
+  """
   def start_link() do
     GenServer.start_link(__MODULE__, [], name: __MODULE__)
   end
@@ -10,15 +18,20 @@ defmodule Delta.DataLayer.CrashHandler do
     {:ok, %{}}
   end
 
-  @spec add(Delta.DataLayer.layer_id()) :: :ok
   @spec add(Delta.DataLayer.layer_id(), function()) :: :ok
-  def add(layer_id, crash_handler \\ fn -> nil end) do
+  @doc """
+  Adds data layer crash handler.
+  """
+  def add(layer_id, crash_handler) do
     pid = Delta.DataLayer.layer_id_pid(layer_id)
 
     GenServer.cast(__MODULE__, {:add, pid, crash_handler})
   end
 
   @spec remove(Delta.DataLayer.layer_id()) :: :ok
+  @doc """
+  Removes crash handler of data layer.
+  """
   def remove(layer_id) do
     pid = Delta.DataLayer.layer_id_pid(layer_id)
     GenServer.cast(__MODULE__, {:remove, pid})
