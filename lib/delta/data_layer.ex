@@ -30,11 +30,6 @@ defmodule Delta.DataLayer do
               {:ok, pid} | {:error, any()}
 
   @doc """
-  Performs all required actions for *data layer* to be available on all nodes in list.
-  """
-  @callback replicate(nodes :: [node()]) :: :ok
-
-  @doc """
   Returns function that should be called on process which monitors *data layer*.
   """
   @callback crash_handler(any()) :: fun()

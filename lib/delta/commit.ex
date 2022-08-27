@@ -58,44 +58,35 @@ defmodule Delta.Commit do
   @doc """
   Same as `Delta.Commit.list/1`, but returns data with continuation
   """
-  @callback list(DataLayer.t(), Delta.Document.id(), continuation? :: boolean()) ::
+  @callback list(DataLayer.layer_id(), continuation? :: boolean()) ::
               {:atomic, [t()], DataLayer.continuation()}
               | {:aborted, DoesNotExist.t(), DataLayer.continuation()}
   @doc """
   Same as `Delta.Commit.list/2`, but returns data with continuation
   """
-  @callback list(DataLayer.t(), id(), id(), continuation? :: boolean()) ::
+  @callback list(DataLayer.layer_id(), id(), id(), continuation? :: boolean()) ::
               {:atomic, [t()], DataLayer.continuation()}
               | {:aborted, DoesNotExist.t(), DataLayer.continuation()}
   @doc """
   Same as `Delta.Commit.get/1`, but returns data with continuation
   """
-  @callback get(DataLayer.t(), id(), continuation? :: boolean()) ::
+  @callback get(DataLayer.layer_id(), id(), continuation? :: boolean()) ::
               {:atomic, t(), DataLayer.continuation()}
               | {:aborted, DoesNotExist.t(), DataLayer.continuation()}
-  @doc """
-  Same as `Delta.Commit.create/1 ::`, but returns data with continuation
-  """
-  @callback create(DataLayer.t(), t(), continuation? :: boolean()) ::
+
+  @callback write(DataLayer.layer_id(), t(), continuation? :: boolean()) ::
               {:atomic, t(), DataLayer.continuation()}
-              | {:aborted, DoesNotExist.t() | AlreadyExist.t(),
-                 DataLayer.continuation()}
-  @doc """
-  Same as `Delta.Commit.update/2`, but returns data with continuation
-  """
-  @callback update(DataLayer.t(), id(), map() | keyword(), continuation? :: boolean()) ::
-              {:atomic, t(), DataLayer.continuation()}
-              | {:aborted, DoesNotExist.t(), DataLayer.continuation()}
+              | {:aborted, DoesNotExist.t() | AlreadyExist.t(), DataLayer.continuation()}
   @doc """
   Same as `Delta.Commit.squash/2`, but returns data with continuation
   """
-  @callback squash(DataLayer.t(), id(), id(), continuation? :: boolean()) ::
+  @callback squash(DataLayer.layer_id(), id(), id(), continuation? :: boolean()) ::
               {:atomic, t(), DataLayer.continuation()}
               | {:aborted, DoesNotExist.t(), DataLayer.continuation()}
   @doc """
   Same as `Delta.Commit.delete/1`, but returns data with continuation
   """
-  @callback delete(DataLayer.t(), id(), continuation? :: boolean()) ::
+  @callback delete(DataLayer.layer_id(), id(), continuation? :: boolean()) ::
               {:atomic, :ok, DataLayer.continuation()}
 
   @doc """
@@ -131,27 +122,10 @@ defmodule Delta.Commit do
   def get(commit_id), do: nil
 
   @doc """
-  Creates commit.
-
-  Aborts with `%Delta.Errors.DoesNotExist{}` if
-  commit with `id = commit.previous_commit_id`
-  or document with `id = commit.document_id` does not exist.
-
-  Aborts with `%Delta.Errors.AlreadyExists{}` if commit with `id = commit.id` already exists.
+  Writies commit commit.
   """
-  @spec create(t()) :: {:atomic, t()} | {:aborted, DoesNotExist.t() | AlreadyExist.t()}
-  def create(commit), do: nil
-
-  @doc """
-  Updates commit.
-
-  Aborts with `%Delta.Errors.DoesNotExist{}` if
-  commit with `id = commit.previous_commit_id`
-  or document with `id = commit.document_id`
-  or commit with `id = commit.id` does not exist.
-  """
-  @spec update(id(), map() | keyword()) :: {:atomic, t()} | {:aborted, DoesNotExist.t()}
-  def update(commit, attrs \\ []), do: nil
+  @spec write(t()) :: {:atomic, t()} | {:aborted, any()}
+  def write(commit), do: nil
 
   @doc """
   Squashes Delta.Commit with `id = commit_id_2` into one with `id = commit_id_1`.
