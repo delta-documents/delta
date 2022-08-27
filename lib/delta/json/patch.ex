@@ -51,29 +51,31 @@ defmodule Delta.Json.Patch do
 
   def parse(o) when is_list(o) do
     try do
-      Enum.map(o, fn
-        %{"op" => "test"} ->
-          nil
+      {:ok,
+       o
+       |> Enum.map(fn
+         %{"op" => "test"} ->
+           nil
 
-        %{"op" => "remove", "path" => path} ->
-          {:remove, path} |> parse_path()
+         %{"op" => "remove", "path" => path} ->
+           {:remove, path} |> parse_path()
 
-        %{"op" => "add", "path" => path, "value" => value} ->
-          {:add, path, value} |> parse_path()
+         %{"op" => "add", "path" => path, "value" => value} ->
+           {:add, path, value} |> parse_path()
 
-        %{"op" => "replace", "path" => path, "value" => value} ->
-          {:add, path, value} |> parse_path()
+         %{"op" => "replace", "path" => path, "value" => value} ->
+           {:add, path, value} |> parse_path()
 
-        %{"op" => "move", "from" => from, "path" => path} ->
-          {:move, path, from} |> parse_path()
+         %{"op" => "move", "from" => from, "path" => path} ->
+           {:move, path, from} |> parse_path()
 
-        %{"op" => "copy", "from" => from, "path" => path} ->
-          {:copy, path, from} |> parse_path()
+         %{"op" => "copy", "from" => from, "path" => path} ->
+           {:copy, path, from} |> parse_path()
 
-        item ->
-          throw({:error, item})
-      end)
-      |> Enum.filter(fn x -> x != nil end)
+         item ->
+           throw({:error, item})
+       end)
+       |> Enum.filter(fn x -> x != nil end)}
     catch
       x -> x
     end
@@ -94,10 +96,7 @@ defmodule Delta.Json.Patch do
   def normalize(patch) do
     patch
     |> Enum.with_index(fn
-      {:add, p, _} = op, i -> {p, {op, i}}
-      {:remove, p} = op, i -> {p, {op, i}}
-      {:move, p, _} = op, i -> {p, {op, i}}
-      {:copy, p, _} = op, i -> {p, {op, i}}
+      op, i -> {elem(op, 1), {op, i}}
     end)
     |> Enum.into(%{})
     |> Enum.sort_by(fn {_, {_, i}} -> i end)
@@ -107,7 +106,7 @@ defmodule Delta.Json.Patch do
   @doc """
   Returns true if two patches have operations on overlapping paths
   """
-  def overlaps?(patch1, patch2) do
+  def overlap?(patch1, patch2) do
     for p1 <- patch1, p2 <- patch2 do
       if Delta.Json.Pointer.overlap?(elem(p1, 1), elem(p2, 1)), do: throw(true)
     end

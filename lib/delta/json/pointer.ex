@@ -9,6 +9,7 @@ defmodule Delta.Json.Pointer do
   def parse(s) do
     result =
       s
+      |> String.trim_leading("/")
       |> String.split("/")
       |> Enum.map(fn s ->
         case Integer.parse(s) do
