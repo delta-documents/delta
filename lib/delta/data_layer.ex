@@ -34,17 +34,6 @@ defmodule Delta.DataLayer do
   """
   @callback crash_handler(any()) :: fun()
 
-  @doc """
-  Runs continuation on *data layer*.
-  """
-  @callback continue(layer_id(), continuation()) :: any()
-
-  @doc """
-  Runs continuation on data layer with `layer_id`.
-  """
-  @spec continue(layer_id(), continuation()) :: any()
-  def continue(_, nil), do: nil
-
   def continue(layer_id, continuation) do
     {m, _} = layer_id_normal(layer_id)
 
