@@ -34,12 +34,6 @@ defmodule Delta.DataLayer do
   """
   @callback crash_handler(any()) :: fun()
 
-  def continue(layer_id, continuation) do
-    {m, _} = layer_id_normal(layer_id)
-
-    m.continue(layer_id, continuation)
-  end
-
   @doc """
   Converts `layer_id` to pid form.
   """
