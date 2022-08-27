@@ -107,7 +107,7 @@ defmodule Delta.Commit.CacheLayer do
               end
           end
 
-        {:atomic, Enum.map(result, &from_record/1), continuation}
+        {:atomic, result, continuation}
 
       {status, result} ->
         {status, result,
@@ -154,7 +154,7 @@ defmodule Delta.Commit.CacheLayer do
 
   See `Delta.Commit.write/1`
   """
-  def write({__MODULE__, document_id} = layer_id, commit, continuation?) do
+  def write({__MODULE__, document_id} = layer_id, %Commit{document_id: document_id} = commit, continuation?) do
     with {:atomic, result} <- :mnesia.transaction(write_transaction(commit)) do
       id = Commit.id(result)
 
@@ -241,7 +241,12 @@ defmodule Delta.Commit.CacheLayer do
       from_order = elem(from, 1)
       to_order = elem(to, 1)
 
-      {Enum.flat_map(from_order..to_order//-1, &:mnesia.read(table, &1)), to}
+      {
+        from_order..to_order//-1
+        |> Enum.flat_map(&:mnesia.read(table, &1))
+        |> Enum.map(&from_record/1),
+        from_record(to)
+      }
     end
   end
 
@@ -274,7 +279,7 @@ defmodule Delta.Commit.CacheLayer do
   end
 
   defp add_continuation(layer_id, continuation),
-    do: GenServer.cast(DataLayer.layer_id_pid(layer_id), {:add_continuation, continuation})
+    do: layer_id |> DataLayer.layer_id_pid() |> GenServer.cast({:add_continuation, continuation})
 
   defp from_record(
          {_, order, id, previous_commit_id, document_id, autosquash?, delta, reverse_delta, meta,
@@ -293,19 +298,17 @@ defmodule Delta.Commit.CacheLayer do
     }
   end
 
-  defp to_record(
-         %Commit{
-           id: id,
-           previous_commit_id: previous_commit_id,
-           document_id: document_id,
-           order: order,
-           autosquash?: autosquash?,
-           delta: delta,
-           reverse_delta: reverse_delta,
-           meta: meta,
-           updated_at: updated_at
-         }
-       ) do
+  defp to_record(%Commit{
+         id: id,
+         previous_commit_id: previous_commit_id,
+         document_id: document_id,
+         order: order,
+         autosquash?: autosquash?,
+         delta: delta,
+         reverse_delta: reverse_delta,
+         meta: meta,
+         updated_at: updated_at
+       }) do
     {document_id_to_table(document_id), order, id, previous_commit_id, autosquash?, delta,
      reverse_delta, meta, updated_at}
   end
