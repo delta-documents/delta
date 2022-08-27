@@ -24,4 +24,6 @@ defmodule Delta.Json.Pointer do
 
     {:ok, result}
   end
+
+  def overlap?(path1, path2), do: List.starts_with?(path1, path2) || List.starts_with?(path2, path1)
 end

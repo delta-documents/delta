@@ -30,12 +30,12 @@ defmodule Delta.Json.Patch do
   @typedoc """
   Moves the value from a path to another path. If the from path cant be resolved, the moved value will be `nil`.
   """
-  @type move() :: {:move, from :: Json.Pointer.t(), Json.Pointer.t()}
+  @type move() :: {:move, Json.Pointer.t(), from :: Json.Pointer.t()}
 
   @typedoc """
   Copies the value from a path to another path. If the from path cant be resolved, the copied value will be `nil`.
   """
-  @type copy() :: {:copy, from :: Json.Pointer.t(), Json.Pointer.t()}
+  @type copy() :: {:copy, Json.Pointer.t(), from :: Json.Pointer.t()}
 
   @doc """
   Parses json patch into Delta.Json.Patch.t()
@@ -64,11 +64,11 @@ defmodule Delta.Json.Patch do
         %{"op" => "replace", "path" => path, "value" => value} ->
           {:add, path, value} |> parse_path()
 
-        %{"op" => "move", "from" => path, "path" => value} ->
-          {:move, path, value} |> parse_path()
+        %{"op" => "move", "from" => from, "path" => path} ->
+          {:move, path, from} |> parse_path()
 
-        %{"op" => "copy", "from" => path, "path" => value} ->
-          {:copy, path, value} |> parse_path()
+        %{"op" => "copy", "from" => from, "path" => path} ->
+          {:copy, path, from} |> parse_path()
 
         item ->
           throw({:error, item})
@@ -94,14 +94,27 @@ defmodule Delta.Json.Patch do
   def normalize(patch) do
     patch
     |> Enum.with_index(fn
-      {:add,    p, _} = op, i -> {p, {op, i}}
-      {:remove, p   } = op, i -> {p, {op, i}}
-      {:move,   p, _} = op, i -> {p, {op, i}}
-      {:copy,   p, _} = op, i -> {p, {op, i}}
+      {:add, p, _} = op, i -> {p, {op, i}}
+      {:remove, p} = op, i -> {p, {op, i}}
+      {:move, p, _} = op, i -> {p, {op, i}}
+      {:copy, p, _} = op, i -> {p, {op, i}}
     end)
     |> Enum.into(%{})
     |> Enum.sort_by(fn {_, {_, i}} -> i end)
     |> Enum.map(fn {_, {op, _}} -> op end)
+  end
+
+  @doc """
+  Returns true if two patches have operations on overlapping paths
+  """
+  def overlaps?(patch1, patch2) do
+    for p1 <- patch1, p2 <- patch2 do
+      if Delta.Json.Pointer.overlap?(elem(p1, 1), elem(p2, 1)), do: throw(true)
+    end
+
+    false
+  catch
+    x -> x
   end
 
   defp parse_path({:remove, path}) do
