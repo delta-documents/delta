@@ -27,5 +27,5 @@ defmodule Delta.Connection do
   Sends event to every connection
   """
   @spec notify(event()) :: [:ok]
-  def notify(event), do: Swarm.multi_call(__MODULE__, event, 100)
+  def notify(event), do: Swarm.multi_call(__MODULE__, {:notify, event}, 100)
 end
