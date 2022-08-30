@@ -23,6 +23,7 @@ defmodule Delta.Errors do
     defstruct([:commit_id, :conflicts_with, :message])
   end
 
+  @type t() :: DoesNotExist.t() | AlreadyExist.t() | Validation.t() | Conflict.t()
 
   @doc false
   def get_struct(%{__struct__: s}), do: s
