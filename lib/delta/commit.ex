@@ -27,7 +27,7 @@ defmodule Delta.Commit do
   """
 
   alias Delta.DataLayer
-  alias Delta.Errors.{Validation, DoesNotExist, AlreadyExist}
+  alias Delta.Errors.{Validation, DoesNotExist, AlreadyExist, Conflict}
 
   @type t() :: %__MODULE__{
           id: Delta.uuid4(),
@@ -60,13 +60,13 @@ defmodule Delta.Commit do
   """
   @callback list(DataLayer.layer_id(), continuation? :: boolean()) ::
               {:atomic, [t()], DataLayer.continuation()}
-              | {:aborted, DoesNotExist.t(), DataLayer.continuation()}
+
   @doc """
   Same as `Delta.Commit.list/2`, but returns data with continuation
   """
   @callback list(DataLayer.layer_id(), id(), id(), continuation? :: boolean()) ::
               {:atomic, [t()], DataLayer.continuation()}
-              | {:aborted, DoesNotExist.t(), DataLayer.continuation()}
+
   @doc """
   Same as `Delta.Commit.get/1`, but returns data with continuation
   """
@@ -74,8 +74,18 @@ defmodule Delta.Commit do
               {:atomic, t(), DataLayer.continuation()}
               | {:aborted, DoesNotExist.t(), DataLayer.continuation()}
 
+  @doc """
+  Same as Delta.Commit.write/1, but returns data with continuation
+  """
   @callback write(DataLayer.layer_id(), t(), continuation? :: boolean()) ::
               {:atomic, t(), DataLayer.continuation()}
+              | {:aborted, DoesNotExist.t() | AlreadyExist.t(), DataLayer.continuation()}
+
+  @doc """
+  Same as Delta.Commit.write_many/1, but returns data with continuation
+  """
+  @callback write_many(DataLayer.layer_id(), [t()], continuation? :: boolean()) ::
+              {:atomic, [t()], DataLayer.continuation()}
               | {:aborted, DoesNotExist.t() | AlreadyExist.t(), DataLayer.continuation()}
   @doc """
   Same as `Delta.Commit.squash/2`, but returns data with continuation
@@ -96,17 +106,27 @@ defmodule Delta.Commit do
   - `:previous_commit_id` – must be UUIDv4 in default form of previous commit or `nil`
   - `:delta` – must be valid RFC 6092 Json delta
   - `:document_id` – must be valid UUIDv4 of document in default form.
+
+  Note: other functions exptect valid input, therefor before passing data to them it should be validated.
   """
   @spec validate(t() | any()) :: {:ok, t()} | {:error, Validation.t()}
   def validate(commit), do: nil
 
   @doc """
+  Validates commits according to the following rules:
+
+  - Commits must be sequential, i. e. `commit[i].id = commit[i + 1].previous_id`
+  - All commits must have same `:document_id`
+  - Each commit must be valid (See `validate/1`)
+  """
+  @spec validate_many([t() | any]) :: {:ok, [t()]} | {:error, Validation.t()}
+  def validate_many(commits), do: nil
+
+  @doc """
   Lists commits of `Delta.Documnent` with `id = document_id`. Expensive operation.
   If document does not exists, returns empty list
-
-  Aborts if document with `id = document_id` does not exist.
   """
-  @spec list(Delta.Document.id()) :: {:atomic, [t()]} | {:aborted, DoesNotExist.t()}
+  @spec list(Delta.Document.id()) :: {:atomic, [t()]}
   def list(document_id), do: nil
 
   @doc """
@@ -115,17 +135,36 @@ defmodule Delta.Commit do
   If commit with `id = from_commit_id` does not exist, assumes it to be the latest commit.
   If commit with `id = to_commit_id` does not exist, assumes it to be the first commit.
   """
-  @spec list(id(), id()) :: {:atomic, [t()]} | {:aborted, DoesNotExist.t()}
-  def list(from_commit_id, to_commit_id), do: nil
+  @spec list(Delta.Document.id(), id(), id()) :: {:atomic, [t()]}
+  def list(document_id, from_commit_id, to_commit_id), do: nil
 
-  @spec get(id()) :: {:atomic, t()} | {:aborted, DoesNotExist.t()}
-  def get(commit_id), do: nil
+  @spec get(Delta.Document.id(), id()) :: {:atomic, t()} | {:aborted, DoesNotExist.t()}
+  def get(document_id, commit_id), do: nil
 
   @doc """
-  Writies commit commit.
+  Writes commit.
   """
   @spec write(t()) :: {:atomic, t()} | {:aborted, any()}
   def write(commit), do: nil
+
+  @doc """
+  Writes commits.
+  """
+  @spec write([t()]) :: {:atomic, [t()]} | {:aborted, any()}
+  def write_many(commits), do: nil
+
+  @doc """
+  Adds commits to a document's history and checks for history consistency.
+
+  Checks for conflicts of the first commit.
+
+  If the commit has resolvable conflict (commits's delta does not overlaps with deltas of all conflicting commits), resolves the conflict and writes the commit.
+  If the commit has no conflicts, writes the commit.
+
+  If the commit has unresolvable conflict, aborts with `Delta.Errors.Conflict.t()`.
+  """
+  @spec add_commits([t()]) :: {:atomic, [t()]} | {:aborted, Conflict.t()} | {:aborted, any()}
+  def add_commits(commits), do: nil
 
   @doc """
   Squashes Delta.Commit with `id = commit_id_2` into one with `id = commit_id_1`.
