@@ -17,7 +17,7 @@ defmodule DeltaTest.ErrorsTest do
   end
 
   test "Delta.Errors.Conflict" do
-    assert "Delta.Change with id = 1 conflicts with Delta.Change with id = 2. msg" == to_string(%Conflict{change_id: 1, conflicts_with: 2, message: "msg"})
+    assert "Delta.Commit with id = 1 conflicts with Delta.Commit with id = 2. msg" == to_string(%Conflict{commit_id: 1, conflicts_with: 2, message: "msg"})
   end
 
   test "Delta.Errors.get_struct/1" do

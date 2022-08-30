@@ -19,8 +19,8 @@ defmodule Delta.Errors do
   end
 
   defmodule Conflict do
-    @type t() :: %__MODULE__{change_id: Delta.uuid4(), conflicts_with: Delta.uuid4(), message: String.t()}
-    defstruct([:change_id, :conflicts_with, :message])
+    @type t() :: %__MODULE__{commit_id: Delta.uuid4(), conflicts_with: Delta.uuid4(), message: String.t()}
+    defstruct([:commit_id, :conflicts_with, :message])
   end
 
 
@@ -66,5 +66,5 @@ defimpl String.Chars, for: Validation do
 end
 
 defimpl String.Chars, for: Conflict do
-  def to_string(%{change_id: id0, conflicts_with: id1, message: m}), do: "Delta.Change with id = #{E.get_id(id0)} conflicts with Delta.Change with id = #{E.get_id(id1)}." |> E.m_m(m)
+  def to_string(%{commit_id: id0, conflicts_with: id1, message: m}), do: "Delta.Commit with id = #{E.get_id(id0)} conflicts with Delta.Commit with id = #{E.get_id(id1)}." |> E.m_m(m)
 end
