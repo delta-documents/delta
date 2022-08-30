@@ -18,6 +18,7 @@ defmodule Delta.Commit.CacheLayer do
   @impl DataLayer
   @doc """
   Starts this DataLayer with specific document id.
+
   Has no options.
   """
   def start_link(document_id, _ \\ nil) do
@@ -41,6 +42,8 @@ defmodule Delta.Commit.CacheLayer do
 
   @impl Commit
   @doc """
+  Lists all commits on this data layer.
+
   Continuation lists data on another data layer with priority to this data layer.
 
   See `Delta.Commit.list/1`
@@ -58,8 +61,8 @@ defmodule Delta.Commit.CacheLayer do
     {status, result} = :mnesia.transaction(list_transaction(table))
 
     {status, result,
-     fn {mod, ^document_id} = layer_id ->
-       with {:atomic, r, c} <- mod.list(layer_id, false), do: {:atomic, join_lists(r, result), c}
+     fn {mod, ^document_id} = l ->
+       with {:atomic, r, c} <- mod.list(l, false), do: {:atomic, join_lists(r, result), c}
      end}
   end
 
@@ -68,6 +71,8 @@ defmodule Delta.Commit.CacheLayer do
 
   @impl Commit
   @doc """
+  Lists commits from one to another.
+
   Continuation lists data on another data layer with priority to this data layer.
 
   See `Delta.Commit.list/2`
@@ -98,11 +103,11 @@ defmodule Delta.Commit.CacheLayer do
               nil
 
             {nil, nil} ->
-              fn {mod, ^document_id} = layer_id -> mod.list(layer_id, from_id, to_id, false) end
+              fn {mod, ^document_id} = l -> mod.list(l, from_id, to_id, false) end
 
             {%{id: from_id}, to_id} ->
-              fn {mod, ^document_id} = layer_id ->
-                with {:atomic, r, c} <- mod.list(layer_id, from_id, to_id, false),
+              fn {mod, ^document_id} = l ->
+                with {:atomic, r, c} <- mod.list(l, from_id, to_id, false),
                      do: {:atomic, join_lists(r, result), c}
               end
           end
@@ -110,8 +115,7 @@ defmodule Delta.Commit.CacheLayer do
         {:atomic, result, continuation}
 
       {status, result} ->
-        {status, result,
-         fn {mod, ^document_id} = layer_id -> mod.list(layer_id, from_id, to_id, false) end}
+        {status, result, fn {mod, ^document_id} = l -> mod.list(l, from_id, to_id, false) end}
     end
   end
 
@@ -120,7 +124,9 @@ defmodule Delta.Commit.CacheLayer do
 
   @impl Commit
   @doc """
-  Gets commit. If it exists, continuation is alwayus `nil`
+  Gets commit.
+
+  If it exists, continuation is alwayus `nil`
 
   See `Delta.Commit.get/1`
   """
@@ -141,7 +147,7 @@ defmodule Delta.Commit.CacheLayer do
         {:atomic, result, nil}
 
       {status, result} ->
-        {status, result, fn {mod, ^document_id} = layer_id -> mod.get(layer_id, id, false) end}
+        {status, result, fn {mod, ^document_id} = l -> mod.get(l, id, false) end}
     end
   end
 
@@ -150,7 +156,9 @@ defmodule Delta.Commit.CacheLayer do
 
   @impl Commit
   @doc """
-  Writes commit. Continuation wirtes commit on another data layer.
+  Writes commit.
+
+  Continuation wirtes commit on another data layer.
 
   See `Delta.Commit.write/1`
   """
@@ -163,7 +171,6 @@ defmodule Delta.Commit.CacheLayer do
 
     with {:atomic, result} <- :mnesia.transaction(write_transaction(commit)) do
       continuation = fn {mod, ^document_id} = l -> mod.write(l, result, false) end
-
       add_continuation(layer_id, continuation)
 
       {:atomic, result, if(continuation?, do: continuation, else: nil)}
@@ -177,6 +184,34 @@ defmodule Delta.Commit.CacheLayer do
 
   @impl Commit
   @doc """
+  Writes a list of commits. Commits are assumed to have equal `document_id`.
+
+  Continuation writes commits on another data layer
+
+  See `Delta.Commit.write_many/1`
+  """
+  def write_many(
+        {__MODULE__, document_id} = layer_id,
+        [%Commit{document_id: document_id} | _] = commits,
+        continuation?
+      ) do
+    with {:atomic, result} <- :mnesia.transaction(write_many_transaction(commits)) do
+      continuation = fn {mod, ^document_id} = l -> mod.write_many(l, result, false) end
+      add_continuation(layer_id, continuation)
+
+      {:atomic, result, if(continuation?, do: continuation, else: nil)}
+    else
+      {status, result} -> {status, result, nil}
+    end
+  end
+
+  def write_many(_, [], _), do: {:atomic, [], nil}
+
+  def write_many(layer_id, commits, continuation?),
+    do: layer_id |> DataLayer.layer_id_normal() |> write_many(commits, continuation?)
+
+  @impl Commit
+  @doc """
   Deletes commit. Always successful. Continuation deletes commit on antother data layer.
 
   See `Delta.Commit.delete/1`
@@ -185,7 +220,7 @@ defmodule Delta.Commit.CacheLayer do
     table = document_id_to_table(document_id)
     id = Commit.id(id)
 
-    continuation = fn {mod, ^document_id} = layer_id -> mod.delete(layer_id, id, false) end
+    continuation = fn {mod, ^document_id} = l -> mod.delete(l, id, false) end
 
     {status, result} = :mnesia.transaction(fn -> delete_transaction(table, id) end)
     add_continuation(layer_id, continuation)
@@ -349,6 +384,15 @@ defmodule Delta.Commit.CacheLayer do
       |> :mnesia.write()
 
       commit
+    end
+  end
+
+  defp write_many_transaction(commits) do
+    fn ->
+      commits
+      |> Enum.map(&:mnesia.write(to_record(&1)))
+
+      commits
     end
   end
 
