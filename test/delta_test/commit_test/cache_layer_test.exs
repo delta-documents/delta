@@ -1,4 +1,3 @@
-
 defmodule DeltaTest.CommitTest.CacheLayerTest do
   use ExUnit.Case
 
@@ -38,7 +37,7 @@ defmodule DeltaTest.CommitTest.CacheLayerTest do
     id: 1,
     previous_commit_id: nil,
     document_id: 1,
-    order: nil,
+    order: 0,
     autosquash?: false,
     delta: [],
     reverse_delta: nil,
@@ -61,6 +60,16 @@ defmodule DeltaTest.CommitTest.CacheLayerTest do
 
   test "Delta.Commit.CacheLayer.list/4" do
     assert {:atomic, [], nil} = CacheLayer.list(@layer_id, nil, nil, false)
+    assert {:atomic, [], continuation} = CacheLayer.list(@layer_id, nil, nil, true)
+    assert {:atomic, [], _} = continuation.(@test_layer_id)
+
+    assert {:atomic, _, _} = CacheLayer.write(@layer_id, @commit, false)
+
+
+    assert {:atomic, [%Commit{id: 1}], nil} = CacheLayer.list(@layer_id, nil, nil, false)
+    assert {:atomic, [%Commit{id: 1}], nil} = CacheLayer.list(@layer_id, 1, 1, true)
+    assert {:atomic, [%Commit{id: 1}], continuation} = CacheLayer.list(@layer_id, 0, 10, true)
+    assert {:atomic, [%Commit{id: 1}], _} = continuation.(@test_layer_id)
   end
 
   test "Delta.Commit.CacheLayer.get/3" do

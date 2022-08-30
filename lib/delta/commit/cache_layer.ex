@@ -79,7 +79,7 @@ defmodule Delta.Commit.CacheLayer do
     to_id = Commit.id(to)
 
     case :mnesia.transaction(list_transaction(table, from_id, to_id)) do
-      {:atomic, {result, _}} -> {:atomic, Enum.map(result, &from_record/1), nil}
+      {:atomic, {result, _}} -> {:atomic, result, nil}
       {status, result} -> {status, result, nil}
     end
   end
@@ -91,13 +91,16 @@ defmodule Delta.Commit.CacheLayer do
     to_id = Commit.id(to)
 
     case :mnesia.transaction(list_transaction(table, from_id, to_id)) do
-      {:atomic, {result, to}} ->
+      {:atomic, result} ->
         continuation =
-          case {List.last(result), to} do
-            {%{id: id}, %{id: id}} ->
+          case {List.last(result), to_id} do
+            {%{id: id}, id} ->
               nil
 
-            {%{id: from_id}, %{id: to_id}} ->
+            {nil, nil} ->
+              fn {mod, ^document_id} = layer_id -> mod.list(layer_id, from_id, to_id, false) end
+
+            {%{id: from_id}, to_id} ->
               fn {mod, ^document_id} = layer_id ->
                 with {:atomic, r, c} <- mod.list(layer_id, from_id, to_id, false),
                      do: {:atomic, join_lists(r, result), c}
@@ -156,7 +159,7 @@ defmodule Delta.Commit.CacheLayer do
         %Commit{document_id: document_id} = commit,
         continuation?
       ) do
-    commit = struct(commit, updated_at: Delta.Datetime.now())
+    commit = struct(commit, updated_at: Delta.Datetime.now!())
 
     with {:atomic, result} <- :mnesia.transaction(write_transaction(commit)) do
       continuation = fn {mod, ^document_id} = l -> mod.write(l, result, false) end
@@ -288,9 +291,13 @@ defmodule Delta.Commit.CacheLayer do
                :updated_at
              ],
              index: [:id, :previous_commit_id, :autosquash?],
+             type: :ordered_set,
              disc_copies: [node()]
            ) do
       {:ok, state}
+    else
+      {:aborted, reason} -> {:error, reason}
+      reason -> {:error, reason}
     end
   end
 
@@ -316,12 +323,13 @@ defmodule Delta.Commit.CacheLayer do
       from = if from1 == [], do: :mnesia.last(table), else: elem(hd(from1), 1)
       to = if to1 == [], do: :mnesia.first(table), else: elem(hd(to1), 1)
 
-      l =
+      if from != :"$end_of_table" and to != :"$end_of_table" do
         from..to//-1
         |> Enum.flat_map(&:mnesia.read(table, &1))
         |> Enum.map(&from_record/1)
-
-      {l, List.last(l)}
+      else
+        []
+      end
     end
   end
 
