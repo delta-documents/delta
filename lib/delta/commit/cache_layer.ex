@@ -8,7 +8,7 @@ defmodule Delta.Commit.CacheLayer do
 
   alias Delta.DataLayer
   alias Delta.Commit
-  alias Delta.Errors.DoesNotExist
+  alias Delta.Errors.{DoesNotExist, AlreadyExist, Conflict}
 
   @behaviour DataLayer
   @behaviour Delta.Commit
@@ -23,18 +23,19 @@ defmodule Delta.Commit.CacheLayer do
   def start_link(document_id, _ \\ nil) do
     table = document_id_to_table(document_id)
 
-    GenServer.start_link(__MODULE__, [
+    GenServer.start_link(
+      __MODULE__,
       %__MODULE__{document_id: document_id, table: table}
-    ])
+    )
   end
 
   @impl DataLayer
   @doc """
   Returns anonyumous function /0, which deletes mnesia table used by the layer.
   """
-  def crash_handler(state) do
+  def crash_handler(%{table: t}) do
     fn ->
-      Logger.log(:error, "#{__MODULE__} crashed: #{state}")
+      :mnesia.delete_table(t)
     end
   end
 
@@ -58,12 +59,7 @@ defmodule Delta.Commit.CacheLayer do
 
     {status, result,
      fn {mod, ^document_id} = layer_id ->
-       with {:atomic, r, _} <- mod.list(layer_id, document_id, false) do
-         # TODO: cached data is priority
-         (result ++ r)
-         |> Enum.uniq()
-         |> Enum.sort_by(fn %Commit{order: o} -> o end)
-       end
+       with {:atomic, r, c} <- mod.list(layer_id, false), do: {:atomic, join_lists(r, result), c}
      end}
   end
 
@@ -103,7 +99,8 @@ defmodule Delta.Commit.CacheLayer do
 
             {%{id: from_id}, %{id: to_id}} ->
               fn {mod, ^document_id} = layer_id ->
-                with {:atomic, r, _} <- mod.list(layer_id, from_id, to_id, false), do: result ++ r
+                with {:atomic, r, c} <- mod.list(layer_id, from_id, to_id, false),
+                     do: {:atomic, join_lists(r, result), c}
               end
           end
 
@@ -154,13 +151,15 @@ defmodule Delta.Commit.CacheLayer do
 
   See `Delta.Commit.write/1`
   """
-  def write({__MODULE__, document_id} = layer_id, %Commit{document_id: document_id} = commit, continuation?) do
-    with {:atomic, result} <- :mnesia.transaction(write_transaction(commit)) do
-      id = Commit.id(result)
+  def write(
+        {__MODULE__, document_id} = layer_id,
+        %Commit{document_id: document_id} = commit,
+        continuation?
+      ) do
+    commit = struct(commit, updated_at: Delta.Datetime.now())
 
-      continuation = fn {mod, ^document_id} = l ->
-        with {:atomic, result, _} <- get(layer_id, id, false), do: mod.write(l, result, false)
-      end
+    with {:atomic, result} <- :mnesia.transaction(write_transaction(commit)) do
+      continuation = fn {mod, ^document_id} = l -> mod.write(l, result, false) end
 
       add_continuation(layer_id, continuation)
 
@@ -193,6 +192,81 @@ defmodule Delta.Commit.CacheLayer do
   def delete(layer_id, commit, continuation?),
     do: layer_id |> DataLayer.layer_id_normal() |> delete(commit, continuation?)
 
+  # def add_commits(
+  #       {__MODULE__, document_id} = layer_id,
+  #       commits,
+  #       continuation?
+  #     ) do
+  #   now = Delta.Datetime.now()
+  #   commits = Enum.map(commits, &struct(&1, updated_at: now))
+
+  #   case :mnesia.transaction(add_commits_transaction(document_id, commits)) do
+  #     {:atomic, result} ->
+  #       continuation = fn {mod, ^document_id} = layer_id -> mod.write_many(layer_id, commits, false) end
+  #       add_continuation(layer_id, continuation)
+
+  #       {:atomic, result, if(continuation?, do: continuation, else: nil)}
+
+  #     {:aborted, {:continuation, list_continuation}} ->
+
+  #       {:aborted, :continue, fn {mod, ^document_id} = layer_id ->
+  #         history = list_continuation.(layer_id)
+  #         mod.add_commits(layer_id, commits, history, false)
+  #       end}
+
+  #     {status, result} ->
+  #       {status, result, nil}
+  #   end
+  # end
+
+  # defp add_commits_transaction(_, _, []), do: fn -> [] end
+
+  # defp add_commits_transaction(document_id, commits) do
+  #   table = document_id_to_table(document_id)
+  #   [%{previous_commit_id: %{id: previous_id}} | _] = commits = Enum.map(commits, &to_record/1)
+
+  #   fn ->
+  #     latest_id =
+  #       case :mnesia.last(table) do
+  #         :"$end_of_table" -> :"$end_of_table"
+  #         order -> hd(:mnesia.read(order))
+  #       end
+
+  #     case {previous_id, latest_id} do
+  #       {nil, :"$end_of_table"} ->
+  #         write_many_transaction(table, commits)
+
+  #       {id, id} ->
+  #         write_many_transaction(table, commits)
+
+  #       {to_id, latest_id} ->
+  #         case list({__MODULE__, document_id}, latest_id, to_id, true) do
+  #           {:atomic, history, nil} ->
+  #             add_commits_transaction_try_resolve_conflict(table, commits, history)
+
+  #           {:atomic, _, continuation} ->
+  #             :mnesia.abort({:conitnue, continuation})
+  #         end
+  #     end
+  #   end
+  # end
+
+  # defp add_commits_transaction_try_resolve_conflict(
+  #        table,
+  #        [%{id: first_id, delta: first_patch} = first | rest],
+  #        [%{id: conflict_id, previous_commit_id: new_pcid} | _] = history
+  #      ) do
+  #   unless Enum.any?(history, fn %{delta: patch} ->
+  #            Delta.Json.Patch.overlap?(first_patch, patch)
+  #          end) do
+  #     add_commits_transaction_no_conflict(table, [
+  #       struct(first, previous_commit_id: new_pcid) | rest
+  #     ])
+  #   else
+  #     :mnesia.abort(%Conflict{commit_id: first_id, conflicts_with: conflict_id})
+  #   end
+  # end
+
   @impl GenServer
   def init(%{document_id: id, table: table} = state) do
     Swarm.register_name({__MODULE__, id}, self())
@@ -200,22 +274,24 @@ defmodule Delta.Commit.CacheLayer do
 
     DataLayer.CrashHandler.add(self(), crash_handler(state))
 
-    :mnesia.create_table(table,
-      attributes: [
-        :order,
-        :id,
-        :previous_commit_id,
-        :autosquash?,
-        :delta,
-        :reverse_delta,
-        :meta,
-        :updated_at
-      ],
-      index: [:id, :previous_commit_id, :autosquash?],
-      disc_copies: [node()]
-    )
-
-    {:ok, state}
+    with {:atomic, _} <-
+           :mnesia.create_table(table,
+             attributes: [
+               :order,
+               :id,
+               :previous_commit_id,
+               :document_id,
+               :autosquash?,
+               :delta,
+               :reverse_delta,
+               :meta,
+               :updated_at
+             ],
+             index: [:id, :previous_commit_id, :autosquash?],
+             disc_copies: [node()]
+           ) do
+      {:ok, state}
+    end
   end
 
   @impl GenServer
@@ -223,11 +299,13 @@ defmodule Delta.Commit.CacheLayer do
     do: {:noreply, struct(state, continuations: [continuation | cs])}
 
   defp list_transaction(table) do
-    :mnesia.foldl(
-      fn rec, acc -> [from_record(rec) | acc] end,
-      [],
-      table
-    )
+    fn ->
+      :mnesia.foldl(
+        fn rec, acc -> [from_record(rec) | acc] end,
+        [],
+        table
+      )
+    end
   end
 
   defp list_transaction(table, from_id, to_id) do
@@ -235,18 +313,15 @@ defmodule Delta.Commit.CacheLayer do
       from1 = :mnesia.index_read(table, from_id, 3)
       to1 = :mnesia.index_read(table, to_id, 3)
 
-      [from] = if from1 == [], do: :mnesia.last(table), else: from1
-      [to] = if to1 == [], do: :mnesia.first(table), else: to1
+      from = if from1 == [], do: :mnesia.last(table), else: elem(hd(from1), 1)
+      to = if to1 == [], do: :mnesia.first(table), else: elem(hd(to1), 1)
 
-      from_order = elem(from, 1)
-      to_order = elem(to, 1)
-
-      {
-        from_order..to_order//-1
+      l =
+        from..to//-1
         |> Enum.flat_map(&:mnesia.read(table, &1))
-        |> Enum.map(&from_record/1),
-        from_record(to)
-      }
+        |> Enum.map(&from_record/1)
+
+      {l, List.last(l)}
     end
   end
 
@@ -309,9 +384,20 @@ defmodule Delta.Commit.CacheLayer do
          meta: meta,
          updated_at: updated_at
        }) do
-    {document_id_to_table(document_id), order, id, previous_commit_id, autosquash?, delta,
-     reverse_delta, meta, updated_at}
+    {document_id_to_table(document_id), order, id, previous_commit_id, document_id, autosquash?,
+     delta, reverse_delta, meta, updated_at}
   end
 
   defp document_id_to_table(id), do: :"#{__MODULE__}.#{id}"
+
+  defp into_map(l), do: l |> Enum.map(&{&1.order, &1}) |> Enum.into(%{})
+
+  defp join_lists(a, b) do
+    a = into_map(a)
+    b = into_map(b)
+
+    Map.merge(a, b)
+    |> Enum.sort_by(&elem(&1, 0))
+    |> Enum.map(&elem(&1, 1))
+  end
 end
