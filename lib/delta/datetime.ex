@@ -10,4 +10,7 @@ defmodule Delta.Datetime do
   By default it is `"Etc/UTC"`
   """
   def now(default_tz \\ "Etc/UTC"), do: DateTime.now(Application.get_env(:delta, :timezone, default_tz))
+
+  @spec now!(Calendar.time_zone()) :: DateTime.t()
+  def now!(default_tz \\ "Etc/UTC"), do: DateTime.now!(Application.get_env(:delta, :timezone, default_tz))
 end
