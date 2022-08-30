@@ -123,7 +123,9 @@ defmodule Delta.Commit do
   def validate_many(commits), do: nil
 
   @doc """
-  Lists commits of `Delta.Documnent` with `id = document_id`. Expensive operation.
+  Lists commits of `Delta.Documnent` with `id = document_id`.
+
+  Expensive operation.
   If document does not exists, returns empty list
   """
   @spec list(Delta.Document.id()) :: {:atomic, [t()]}
@@ -168,6 +170,7 @@ defmodule Delta.Commit do
 
   @doc """
   Squashes Delta.Commit with `id = commit_id_2` into one with `id = commit_id_1`.
+
   Resulting commit will have metadata of the second commit.
 
   The second commit may not exist.
@@ -179,7 +182,8 @@ defmodule Delta.Commit do
 
   @doc """
   Deletes commit with `id = commit_id`.
-  Returns {:atomic, :ok} even if commit with `id = commit_id` does not exist.
+
+  Returns `{:atomic, :ok}` even if commit with `id = commit_id` does not exist.
   """
   @spec delete(id()) :: {:atomic, :ok}
   def delete(change_id), do: nil
