@@ -148,7 +148,7 @@ defmodule Delta.Commit do
   @doc """
   Gets id from id()
   """
-  @spec id(id) :: Delta.uuid4()
+  @spec id(id) :: Delta.uuid4() | any()
   def id(%__MODULE__{id: id}), do: id
   def id(id), do: id
 end
