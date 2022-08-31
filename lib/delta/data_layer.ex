@@ -21,13 +21,26 @@ defmodule Delta.DataLayer do
   @typedoc """
   Specifies operation continuation on another data layer. Is executed on data layer with `layer_id`.
   """
-  @type continuation :: (layer_id() -> any()) | nil
+  @type continuation :: (layer_id() -> any()) | {atom(), [any()]} | nil
 
   @doc """
   Starts *data layer* for isolating any data related to document.
   """
   @callback start_link(document_id :: Delta.Document.t() | Delta.uuid4(), opts :: keyword()) ::
               {:ok, pid} | {:error, any()}
+
+  @doc """
+  Runs continuation on specified layer
+  """
+  @spec continue(layer_id, continuation()) :: any()
+  def continue({_mod, _document_id} = layer_id, continuation) when is_function(continuation),
+    do: continuation.(layer_id)
+
+  def continue({mod, _document_id}, {fun, args}), do: apply(mod, fun, args)
+  def continue(_, nil), do: nil
+
+  def continue(layer_id, continuation),
+    do: layer_id |> layer_id_normal() |> continue(continuation)
 
   @doc """
   Returns function that should be called on process which monitors *data layer*.
