@@ -75,7 +75,7 @@ defmodule Delta.Commit.CacheLayer do
 
   Continuation lists data on another data layer with priority to this data layer.
 
-  See `Delta.Commit.list/2`
+  See `Delta.Commit.list/3`
   """
   def list({__MODULE__, document_id}, from, to, false) do
     table = document_id_to_table(document_id)
@@ -101,18 +101,20 @@ defmodule Delta.Commit.CacheLayer do
             nil
 
           {nil, _} ->
-            fn {mod, ^document_id} = l -> mod.list(l, from_id, to_id, false) end
+            {:list, [from_id, to_id, false]}
 
           {%{id: from_id}, to_id} ->
             fn {mod, ^document_id} = l ->
-              with {:atomic, r, c} <- mod.list(l, from_id, to_id, false),
-                   do: {:atomic, join_lists(r, result), c}
+              with {:atomic, r, c} <- mod.list(l, from_id, to_id, false) do
+                {:atomic, join_lists(r, result), c}
+              end
             end
         end
 
       {:atomic, result, continuation}
     else
-      {status, result} -> {status, result, fn {mod, ^document_id} = l -> mod.list(l, from_id, to_id, false) end}
+      {status, result} ->
+        {status, result, {:list, [from_id, to_id, false]}}
     end
   end
 
@@ -135,16 +137,15 @@ defmodule Delta.Commit.CacheLayer do
     {status, result, nil}
   end
 
-  def get({__MODULE__, document_id}, id, true) do
+  def get({__MODULE__, document_id}, id, continuation?) do
     table = document_id_to_table(document_id)
     id = Commit.id(id)
 
-    case :mnesia.transaction(get_transaction(table, id)) do
-      {:atomic, result} ->
-        {:atomic, result, nil}
-
+    with {:atomic, result} <- :mnesia.transaction(get_transaction(table, id)) do
+      {:atomic, result, nil}
+    else
       {status, result} ->
-        {status, result, fn {mod, ^document_id} = l -> mod.get(l, id, false) end}
+        {status, result, if(continuation?, do: {:get, [id, false]}, else: nil)}
     end
   end
 
@@ -164,10 +165,8 @@ defmodule Delta.Commit.CacheLayer do
         %Commit{document_id: document_id} = commit,
         continuation?
       ) do
-    commit = struct(commit, updated_at: Delta.Datetime.now!())
-
     with {:atomic, result} <- :mnesia.transaction(write_transaction(commit)) do
-      continuation = fn {mod, ^document_id} = l -> mod.write(l, result, false) end
+      continuation = {:write, [commit, false]}
       add_continuation(layer_id, continuation)
 
       {:atomic, result, if(continuation?, do: continuation, else: nil)}
@@ -193,7 +192,7 @@ defmodule Delta.Commit.CacheLayer do
         continuation?
       ) do
     with {:atomic, result} <- :mnesia.transaction(write_many_transaction(commits)) do
-      continuation = fn {mod, ^document_id} = l -> mod.write_many(l, result, false) end
+      continuation = {:write_many, [result, false]}
       add_continuation(layer_id, continuation)
 
       {:atomic, result, if(continuation?, do: continuation, else: nil)}
@@ -217,10 +216,10 @@ defmodule Delta.Commit.CacheLayer do
     table = document_id_to_table(document_id)
     id = Commit.id(id)
 
-    continuation = fn {mod, ^document_id} = l -> mod.delete(l, id, false) end
+    continuation = {:delete, [id, false]}
+    add_continuation(layer_id, continuation)
 
     {status, result} = :mnesia.transaction(fn -> delete_transaction(table, id) end)
-    add_continuation(layer_id, continuation)
     {status, result, if(continuation?, do: continuation, else: nil)}
   end
 
