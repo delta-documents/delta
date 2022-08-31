@@ -36,7 +36,7 @@ defmodule Delta.DataLayer do
   def continue({_mod, _document_id} = layer_id, continuation) when is_function(continuation),
     do: continuation.(layer_id)
 
-  def continue({mod, _document_id}, {fun, args}), do: apply(mod, fun, args)
+  def continue({mod, _document_id} = layer_id, {fun, args}), do: apply(mod, fun, [layer_id | args])
   def continue(_, nil), do: nil
 
   def continue(layer_id, continuation),
