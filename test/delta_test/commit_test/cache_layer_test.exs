@@ -11,6 +11,17 @@ defmodule DeltaTest.CommitTest.CacheLayerTest do
     :ok
   end
 
+  @commit %Commit{
+    id: 1,
+    previous_commit_id: nil,
+    document_id: 1,
+    order: 0,
+    autosquash?: false,
+    delta: [],
+    reverse_delta: nil,
+    meta: nil
+  }
+
   defmodule TestLayer do
     def list(_, _) do
       {:atomic, [], nil}
@@ -33,43 +44,89 @@ defmodule DeltaTest.CommitTest.CacheLayerTest do
     end
   end
 
-  @commit %Commit{
-    id: 1,
-    previous_commit_id: nil,
-    document_id: 1,
-    order: 0,
-    autosquash?: false,
-    delta: [],
-    reverse_delta: nil,
-    meta: nil
-  }
+  defmodule TestLayer2 do
+    @commit %Commit{
+      id: 1,
+      previous_commit_id: nil,
+      document_id: 1,
+      order: 0,
+      autosquash?: false,
+      delta: [],
+      reverse_delta: nil,
+      meta: nil
+    }
+
+    def list(_, _) do
+      {
+        :atomic,
+        [
+          struct(@commit, id: 2, order: 1),
+          struct(@commit, delta: [:a])
+        ],
+        nil
+      }
+    end
+
+    def list(_, _, _, _) do
+      {
+        :atomic,
+        [
+          struct(@commit, id: 2, order: 1),
+          struct(@commit, delta: [:a])
+        ],
+        nil
+      }
+    end
+
+    def get(_, _, _) do
+      {
+        :atomic,
+        struct(@commit, id: 2, order: 1),
+        nil
+      }
+    end
+
+    def write(_, data, _) do
+      {:atomic, data, nil}
+    end
+
+    def delete(_, data, _) do
+      {:atomic, data, nil}
+    end
+  end
 
   @layer_id {CacheLayer, 1}
   @test_layer_id {TestLayer, 1}
+  @test2_layer_id {TestLayer2, 1}
 
   test "Delta.Commit.CacheLayer.list/2" do
     assert {:atomic, [], nil} = CacheLayer.list(@layer_id, false)
     assert {:atomic, [], continuation} = CacheLayer.list(@layer_id, true)
     assert {:atomic, [], _} = continuation.(@test_layer_id)
+    assert {:atomic, [%Commit{id: 2}, %Commit{id: 1}], _} = continuation.(@test2_layer_id)
 
     assert {:atomic, _, _} = CacheLayer.write(@layer_id, @commit, false)
 
     assert {:atomic, [%Commit{id: 1}], continuation} = CacheLayer.list(@layer_id, true)
-    assert {:atomic, [%Commit{id: 1}], _} = continuation.(@test_layer_id)
+    assert {:atomic, [%Commit{id: 1, delta: []}], _} = continuation.(@test_layer_id)
+
+    assert {:atomic, [%Commit{id: 2}, %Commit{id: 1, delta: []}], _} =
+             continuation.(@test2_layer_id)
   end
 
   test "Delta.Commit.CacheLayer.list/4" do
     assert {:atomic, [], nil} = CacheLayer.list(@layer_id, nil, nil, false)
     assert {:atomic, [], continuation} = CacheLayer.list(@layer_id, nil, nil, true)
     assert {:atomic, [], _} = continuation.(@test_layer_id)
+    assert {:atomic, [%Commit{id: 2}, %Commit{id: 1}], _} = continuation.(@test2_layer_id)
 
     assert {:atomic, _, _} = CacheLayer.write(@layer_id, @commit, false)
-
 
     assert {:atomic, [%Commit{id: 1}], nil} = CacheLayer.list(@layer_id, nil, nil, false)
     assert {:atomic, [%Commit{id: 1}], nil} = CacheLayer.list(@layer_id, 1, 1, true)
     assert {:atomic, [%Commit{id: 1}], continuation} = CacheLayer.list(@layer_id, 0, 10, true)
     assert {:atomic, [%Commit{id: 1}], _} = continuation.(@test_layer_id)
+    assert {:atomic, [%Commit{id: 2}, %Commit{id: 1}], _} = continuation.(@test2_layer_id)
   end
 
   test "Delta.Commit.CacheLayer.get/3" do

@@ -83,10 +83,9 @@ defmodule Delta.Commit.CacheLayer do
     from_id = Commit.id(from)
     to_id = Commit.id(to)
 
-    case :mnesia.transaction(list_transaction(table, from_id, to_id)) do
-      {:atomic, {result, _}} -> {:atomic, result, nil}
-      {status, result} -> {status, result, nil}
-    end
+    {status, result} = :mnesia.transaction(list_transaction(table, from_id, to_id))
+
+    {status, result, nil}
   end
 
   def list({__MODULE__, document_id}, from, to, true) do
@@ -95,27 +94,25 @@ defmodule Delta.Commit.CacheLayer do
     from_id = Commit.id(from)
     to_id = Commit.id(to)
 
-    case :mnesia.transaction(list_transaction(table, from_id, to_id)) do
-      {:atomic, result} ->
-        continuation =
-          case {List.last(result), to_id} do
-            {%{id: id}, id} ->
-              nil
+    with {:atomic, result} <- :mnesia.transaction(list_transaction(table, from_id, to_id)) do
+      continuation =
+        case {List.last(result), to_id} do
+          {%{id: id}, id} ->
+            nil
 
-            {nil, nil} ->
-              fn {mod, ^document_id} = l -> mod.list(l, from_id, to_id, false) end
+          {nil, _} ->
+            fn {mod, ^document_id} = l -> mod.list(l, from_id, to_id, false) end
 
-            {%{id: from_id}, to_id} ->
-              fn {mod, ^document_id} = l ->
-                with {:atomic, r, c} <- mod.list(l, from_id, to_id, false),
-                     do: {:atomic, join_lists(r, result), c}
-              end
-          end
+          {%{id: from_id}, to_id} ->
+            fn {mod, ^document_id} = l ->
+              with {:atomic, r, c} <- mod.list(l, from_id, to_id, false),
+                   do: {:atomic, join_lists(r, result), c}
+            end
+        end
 
-        {:atomic, result, continuation}
-
-      {status, result} ->
-        {status, result, fn {mod, ^document_id} = l -> mod.list(l, from_id, to_id, false) end}
+      {:atomic, result, continuation}
+    else
+      {status, result} -> {status, result, fn {mod, ^document_id} = l -> mod.list(l, from_id, to_id, false) end}
     end
   end
 
@@ -452,7 +449,7 @@ defmodule Delta.Commit.CacheLayer do
     b = into_map(b)
 
     Map.merge(a, b)
-    |> Enum.sort_by(&elem(&1, 0))
+    |> Enum.sort_by(&elem(&1, 0), :desc)
     |> Enum.map(&elem(&1, 1))
   end
 end
