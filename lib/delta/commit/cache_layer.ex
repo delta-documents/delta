@@ -355,8 +355,11 @@ defmodule Delta.Commit.CacheLayer do
       from1 = :mnesia.index_read(table, from_id, 3)
       to1 = :mnesia.index_read(table, to_id, 3)
 
-      from = if from1 == [], do: :mnesia.last(table), else: elem(hd(from1), 1)
-      to = if to1 == [], do: :mnesia.first(table), else: elem(hd(to1), 1)
+      from2 = if from1 == [], do: :mnesia.last(table), else: elem(hd(from1), 1)
+      to2 = if to1 == [], do: :mnesia.first(table), else: elem(hd(to1), 1)
+
+      from = max(from2, to2)
+      to = min(from2, to2)
 
       if from != :"$end_of_table" and to != :"$end_of_table" do
         from..to//-1
