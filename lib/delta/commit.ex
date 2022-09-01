@@ -64,7 +64,7 @@ defmodule Delta.Commit do
   @doc """
   Same as `Delta.Commit.list/2`, but returns data with continuation
   """
-  @callback list(DataLayer.layer_id(), id(), id(), continuation? :: boolean()) ::
+  @callback list(DataLayer.layer_id(), id() | nil, id() | nil, continuation? :: boolean()) ::
               {:atomic, [t()], DataLayer.continuation()}
 
   @doc """
@@ -188,10 +188,25 @@ defmodule Delta.Commit do
   @spec delete(id()) :: {:atomic, :ok}
   def delete(change_id), do: nil
 
+  def resolve_conflict(commits, []), do: {:ok, commits}
+
+  def resolve_conflicts([%__MODULE__{previous_commit_id: id} | _] = commits, [%__MODULE__{id: id} | _]),
+    do: {:ok, commits}
+
+  def resolve_conflicts(
+        [%__MODULE__{id: id1, delta: d1} = first | rest],
+        [%__MODULE__{id: id2} | _] = history
+      ) do
+    case Enum.filter(history, &Delta.Json.Patch.overlap?(d1, &1)) do
+      [] -> {:ok, [struct(first, previous_commit_id: id2) | rest]}
+      [%__MODULE__{id: id3}] -> {:error, %Conflict{commit_id: id1, conflicts_with: id3}}
+    end
+  end
+
   @doc """
   Gets id from id()
   """
-  @spec id(id) :: Delta.uuid4() | any()
+  @spec id(id() | nil) :: Delta.uuid4() | any()
   def id(%__MODULE__{id: id}), do: id
   def id(id), do: id
 end

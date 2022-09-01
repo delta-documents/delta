@@ -3,10 +3,10 @@ defmodule Delta.Commit.CacheLayer do
   Caching layer for Delta.Commit
   """
 
+  import Delta.DataLayer
   require Logger
   use GenServer
 
-  alias Delta.DataLayer
   alias Delta.Commit
   alias Delta.Errors.{DoesNotExist, AlreadyExist, Conflict}
 
@@ -66,8 +66,7 @@ defmodule Delta.Commit.CacheLayer do
      end}
   end
 
-  def list(layer_id, continuation?),
-    do: layer_id |> DataLayer.layer_id_normal() |> list(continuation?)
+  def list(layer_id, continuation?), do: layer_id |> layer_id_normal() |> list(continuation?)
 
   @impl Commit
   @doc """
@@ -119,7 +118,7 @@ defmodule Delta.Commit.CacheLayer do
   end
 
   def list(layer_id, from, to, continuation?),
-    do: layer_id |> DataLayer.layer_id_normal() |> list(from, to, continuation?)
+    do: layer_id |> layer_id_normal() |> list(from, to, continuation?)
 
   @impl Commit
   @doc """
@@ -150,7 +149,7 @@ defmodule Delta.Commit.CacheLayer do
   end
 
   def get(layer_id, id, continuation?),
-    do: layer_id |> DataLayer.layer_id_normal() |> get(id, continuation?)
+    do: layer_id |> layer_id_normal() |> get(id, continuation?)
 
   @impl Commit
   @doc """
@@ -176,7 +175,7 @@ defmodule Delta.Commit.CacheLayer do
   end
 
   def write(layer_id, commit, continuation?),
-    do: layer_id |> DataLayer.layer_id_normal() |> write(commit, continuation?)
+    do: layer_id |> layer_id_normal() |> write(commit, continuation?)
 
   @impl Commit
   @doc """
@@ -204,7 +203,7 @@ defmodule Delta.Commit.CacheLayer do
   def write_many(_, [], _), do: {:atomic, [], nil}
 
   def write_many(layer_id, commits, continuation?),
-    do: layer_id |> DataLayer.layer_id_normal() |> write_many(commits, continuation?)
+    do: layer_id |> layer_id_normal() |> write_many(commits, continuation?)
 
   @impl Commit
   @doc """
@@ -224,82 +223,72 @@ defmodule Delta.Commit.CacheLayer do
   end
 
   def delete(layer_id, commit, continuation?),
-    do: layer_id |> DataLayer.layer_id_normal() |> delete(commit, continuation?)
+    do: layer_id |> layer_id_normal() |> delete(commit, continuation?)
 
-  # def add_commits(
-  #       {__MODULE__, document_id} = layer_id,
-  #       commits,
-  #       continuation?
-  #     ) do
-  #   now = Delta.Datetime.now()
-  #   commits = Enum.map(commits, &struct(&1, updated_at: now))
+  def add_commits({__MODULE__, _}, [], _), do: {:atomic, [], nil}
 
-  #   case :mnesia.transaction(add_commits_transaction(document_id, commits)) do
-  #     {:atomic, result} ->
-  #       continuation = fn {mod, ^document_id} = layer_id -> mod.write_many(layer_id, commits, false) end
-  #       add_continuation(layer_id, continuation)
+  def add_commits({__MODULE__, _} = layer_id, commits, continuation?) do
+    now = Delta.Datetime.now!()
+    commits = Enum.map(commits, &struct(&1, updated_at: now))
 
-  #       {:atomic, result, if(continuation?, do: continuation, else: nil)}
+    with {:atomic, {result, continuation}} <- :mnesia.transaction(add_commits_transaction(layer_id, commits, continuation?)) do
+      add_continuation(layer_id, continuation)
 
-  #     {:aborted, {:continuation, list_continuation}} ->
+      {:atomic, result, continuation}
+    else
+      {:aborted, reason} -> {:aborted, reason, nil}
+    end
+  end
 
-  #       {:aborted, :continue, fn {mod, ^document_id} = layer_id ->
-  #         history = list_continuation.(layer_id)
-  #         mod.add_commits(layer_id, commits, history, false)
-  #       end}
+  defp add_commits_transaction(
+         layer_id,
+         [%Commit{previous_commit_id: previous_id} | _] = commits,
+         false
+       ) do
+    fn ->
+      with {:atomic, history, nil} <- list(layer_id, nil, previous_id, true),
+           {:ok, commits} <- Commit.resolve_conflicts(commits, history),
+           result <- {:w, write_many_transaction(commits)} do
+        {result, nil}
+      else
+        {:atomic, _, _} ->
+          :mnesia.abort(%DoesNotExist{struct: Commit, id: previous_id})
+        {:error, e} ->
+          :mnesia.abort(e)
+      end
+    end
+  end
 
-  #     {status, result} ->
-  #       {status, result, nil}
-  #   end
-  # end
+  defp add_commits_transaction(
+         layer_id,
+         [%Commit{previous_commit_id: previous_id} | _] = commits,
+         true
+       ) do
+    fn ->
+      with {:atomic, history, nil} <- list(layer_id, nil, previous_id, true),
+           {:ok, commits} <- Commit.resolve_conflicts(commits, history),
+           result <- {:w, write_many_transaction(commits)} do
+        {result, {:write_many, [result, false]}}
+      else
+        {:atomic, _, history_cont} ->
+          continuation = fn l ->
+            with {:atomic, history, nil} <- continue(l, history_cont),
+                 {:ok, commits} <- Commit.resolve_conflicts(commits, history),
+                 {:atomic, result, _} <- write_many(layer_id, commits, false) do
+              {:atomic, result, nil}
+            else
+              {:error, e} -> {:aborted, e, nil}
+              x -> x
+            end
+          end
 
-  # defp add_commits_transaction(_, _, []), do: fn -> [] end
+          {:continue, continuation}
 
-  # defp add_commits_transaction(document_id, commits) do
-  #   table = document_id_to_table(document_id)
-  #   [%{previous_commit_id: %{id: previous_id}} | _] = commits = Enum.map(commits, &to_record/1)
-
-  #   fn ->
-  #     latest_id =
-  #       case :mnesia.last(table) do
-  #         :"$end_of_table" -> :"$end_of_table"
-  #         order -> hd(:mnesia.read(order))
-  #       end
-
-  #     case {previous_id, latest_id} do
-  #       {nil, :"$end_of_table"} ->
-  #         write_many_transaction(table, commits)
-
-  #       {id, id} ->
-  #         write_many_transaction(table, commits)
-
-  #       {to_id, latest_id} ->
-  #         case list({__MODULE__, document_id}, latest_id, to_id, true) do
-  #           {:atomic, history, nil} ->
-  #             add_commits_transaction_try_resolve_conflict(table, commits, history)
-
-  #           {:atomic, _, continuation} ->
-  #             :mnesia.abort({:conitnue, continuation})
-  #         end
-  #     end
-  #   end
-  # end
-
-  # defp add_commits_transaction_try_resolve_conflict(
-  #        table,
-  #        [%{id: first_id, delta: first_patch} = first | rest],
-  #        [%{id: conflict_id, previous_commit_id: new_pcid} | _] = history
-  #      ) do
-  #   unless Enum.any?(history, fn %{delta: patch} ->
-  #            Delta.Json.Patch.overlap?(first_patch, patch)
-  #          end) do
-  #     add_commits_transaction_no_conflict(table, [
-  #       struct(first, previous_commit_id: new_pcid) | rest
-  #     ])
-  #   else
-  #     :mnesia.abort(%Conflict{commit_id: first_id, conflicts_with: conflict_id})
-  #   end
-  # end
+        {:error, e} ->
+          :mnesia.abort(e)
+      end
+    end
+  end
 
   @impl GenServer
   def init(%{document_id: id, table: table} = state) do
