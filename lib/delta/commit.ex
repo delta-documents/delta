@@ -35,8 +35,8 @@ defmodule Delta.Commit do
           document_id: Delta.uuid4(),
           order: non_neg_integer,
           autosquash?: boolean,
-          delta: rfc_6092 :: any,
-          reverse_delta: rfc_6092 :: any,
+          delta: Delta.Json.Patch.t(),
+          reverse_delta: Delta.Json.Patch.t(),
           meta: any,
           updated_at: DateTime.t()
         }
