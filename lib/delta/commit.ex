@@ -1,6 +1,6 @@
 defmodule Delta.Commit do
   @moduledoc """
-  Internal API for working with commits
+  Internal commits API
 
   An interface to work on top of `Delta.DataLayer` which should also implement `Delta.Commit`
   """
@@ -188,8 +188,15 @@ defmodule Delta.Commit do
   @spec delete(id()) :: {:atomic, :ok}
   def delete(change_id), do: nil
 
-  def resolve_conflict(commits, []), do: {:ok, commits}
+  @doc """
+  Checks if commits have conflict(s) with history and resolves them if possible.
 
+  Commits must be sorted by theirs (would be) ascending order – first commit is the first element of the list.
+  History must be sorted by descnding order – last commit is the first element of the list.
+  """
+  @spec resolve_conflicts(commtis :: [t()], history :: [t()]) :: {:ok, [t()]} | {:error, Conflict.t()}
+  def resolve_conflicts([], _), do: {:ok, []}
+  def resolve_conflicts(commits, []), do: {:ok, commits}
   def resolve_conflicts([%__MODULE__{previous_commit_id: id} | _] = commits, [%__MODULE__{id: id} | _]),
     do: {:ok, commits}
 
