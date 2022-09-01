@@ -1,6 +1,6 @@
 defmodule Delta.Document do
   @moduledoc """
-  Internal API for working with documents
+  Internal documents API
   """
 
   @type t() :: %__MODULE__{
