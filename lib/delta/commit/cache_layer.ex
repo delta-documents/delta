@@ -1,6 +1,13 @@
 defmodule Delta.Commit.CacheLayer do
   @moduledoc """
   Caching layer for Delta.Commit
+
+  Works on top of mnesia.
+
+  When started, creates mnesia table `:"\#{Delta.Commit.CacheLayer}.\#{document_id}"` on the node it was started on.
+  All operations are performed on this table.
+
+  All operations are accumulated and then periodically replicated on persistent data layer.
   """
 
   import Delta.DataLayer
