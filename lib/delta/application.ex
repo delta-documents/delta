@@ -12,6 +12,8 @@ defmodule Delta.Application do
       # {Delta.Worker, arg}
     ]
 
+    System.cmd("mkdir", ["-p", Application.fetch_env!(:mnesia, :dir) |> to_string() ])
+
     :mnesia.stop()
     :mnesia.create_schema([node()])
     :mnesia.start()
