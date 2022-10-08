@@ -34,6 +34,7 @@ jobs:
         
       - name: Setup docs repo
         run: |
+          git config --unset-all http.https://github.com/.extraheader
           git config --global user.name "Delta CI"
           git config --global user.email "<>"
 
