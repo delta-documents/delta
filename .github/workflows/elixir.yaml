@@ -31,17 +31,9 @@ jobs:
 
       - run: mix deps.get
       - run: mix test
-        
-      - name: Setup docs repo
-        run: |
-          git config --unset-all http.https://github.com/.extraheader
-          git config --global user.name "Delta CI"
-          git config --global user.email "<>"
 
-          eval `ssh-agent -s`
-          ssh-add - <<< '${{ secrets.DOCS_REPO_SSH }}'
-          
-          git clone https://github.com/delta-documents/docs.git delta-docs-repo
+      - name: Setup docs repo
+        run: git clone https://github.com/delta-documents/docs.git delta-docs-repo
 
       - name: Build docs if main branch or tag
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
@@ -49,32 +41,26 @@ jobs:
 
       - name: Publish docs as latest if main branch
         if: github.ref == 'refs/heads/main'
-        run: |
-          rm -rf delta-docs-repo/delta/latest
-          mkdir -p delta-docs-repo/delta/latest
-          cp -rp doc/* delta-docs-repo/delta/latest/
-
-          cd delta-docs-repo
-
-          git add .
-          git commit -m "docs: delta $GITHUB_SHA"
-          
-          git push
+        env:
+          SSH_DEPLOY_KEY: ${{ secrets.DOCS_REPO_SSH }}
+        with:
+          source-directory: doc
+          destination-github-username: delta-documents
+          destination-repository-name: docs
+          target-directory: delta/latest
+          commit-message: delta ${{ github.sha }}
 
       - name: Publish docs as version if tag and main branch
         if: github.ref == 'refs/heads/main' && startsWith(github.ref, 'refs/tags/v')
-        run: |
-          rm -rf delta-docs-repo/delta/${{github.ref_name}}
-          mkdir -p delta-docs-repo/delta/${{github.ref_name}}
-          cp -rp doc/* delta-docs-repo/delta/${{github.ref_name}}
-
-          cd delta-docs-repo
-
-          git add .
-          git commit -m "docs: delta $GITHUB_SHA as ${{github.ref_name}}"
-          
-          git push
-
+        env:
+          SSH_DEPLOY_KEY: ${{ secrets.DOCS_REPO_SSH }}
+        with:
+          source-directory: doc
+          destination-github-username: delta-documents
+          destination-repository-name: docs
+          target-directory: delta/latest
+          commit-message: delta ${{ github.sha }} as ${{ github.ref_name }}
+        
       - name: Create release if tag and main branch
         if: github.ref == 'refs/heads/main' && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
