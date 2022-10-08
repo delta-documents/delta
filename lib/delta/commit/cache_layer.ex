@@ -15,6 +15,7 @@ defmodule Delta.Commit.CacheLayer do
   use GenServer
 
   alias Delta.Commit
+  alias Delta.DataLayer
   alias Delta.Errors.{DoesNotExist, AlreadyExist, Conflict}
 
   @behaviour DataLayer
