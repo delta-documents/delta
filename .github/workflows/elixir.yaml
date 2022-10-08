@@ -34,7 +34,8 @@ jobs:
         
       - name: Setup docs repo
         run: |
-          git config user.name "Delta CI"
+          git config --global user.name "Delta CI"
+          git config --global user.email "<>"
 
           eval `ssh-agent -s`
           ssh-add - <<< '${{ secrets.DOCS_REPO_SSH }}'
