@@ -25,7 +25,7 @@ defmodule Delta.MixProject do
   def docs do
     [
       authors: ["https://github.com/florius0"],
-      source_ref: (System.get_env("EXDOC_SOURCE_REF") || "main") |> IO.inspect(),
+      source_ref: System.get_env("EXDOC_SOURCE_REF") || "main",
       main: "readme",
       extras: ~w(README.md),
       formatters: ["html"],
