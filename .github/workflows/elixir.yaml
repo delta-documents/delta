@@ -24,16 +24,13 @@ jobs:
           path: |
             deps
             _build
-          key: delta-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
+          key: ${{ github.event.repository.name }}-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
           restore-keys: |
-            delta-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
-            delta-
+            ${{ github.event.repository.name }}-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
+            ${{ github.event.repository.name }}-
 
       - run: mix deps.get
       - run: mix test
-
-      - name: Setup docs repo
-        run: git clone https://github.com/delta-documents/docs.git delta-docs-repo
 
       - name: Build docs if main branch or tag
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
@@ -48,8 +45,8 @@ jobs:
           source-directory: doc
           destination-github-username: delta-documents
           destination-repository-name: docs
-          target-directory: delta/latest
-          commit-message: delta ${{ github.sha }}
+          target-directory: ${{ github.event.repository.name }}/latest
+          commit-message: ${{ github.event.repository.name }} on ${{ github.sha }}
 
       - name: Publish docs as version if tag and main branch
         if: github.ref == 'refs/heads/main' && startsWith(github.ref, 'refs/tags/v')
@@ -60,8 +57,8 @@ jobs:
           source-directory: doc
           destination-github-username: delta-documents
           destination-repository-name: docs
-          target-directory: delta/latest
-          commit-message: delta ${{ github.sha }} as ${{ github.ref_name }}
+          target-directory: ${{ github.event.repository.name }}/latest
+          commit-message: ${{ github.event.repository.name }} on ${{ github.sha }} as ${{ github.ref_name }}
         
       - name: Create release if tag and main branch
         if: github.ref == 'refs/heads/main' && startsWith(github.ref, 'refs/tags/v')
