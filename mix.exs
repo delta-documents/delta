@@ -4,14 +4,17 @@ defmodule Delta.MixProject do
   def project do
     [
       app: :delta,
+      name: "Delta",
       version: "0.1.0",
-      elixir: "~> 1.13",
+      source_url: "https://github.com/delta-documents/delta",
+      homepage_url: "https://github.com/delta-documents",
+      elixir: "~> 1.14",
+      deps: deps(),
+      docs: docs(),
       start_permanent: Mix.env() == :prod,
-      deps: deps()
     ]
   end
 
-  # Run "mix help compile.app" to learn about applications.
   def application do
     [
       extra_applications: [:logger, :os_mon, :mnesia],
@@ -19,7 +22,17 @@ defmodule Delta.MixProject do
     ]
   end
 
-  # Run "mix help deps" to learn about dependencies.
+  def docs do
+    [
+      authors: "florius0",
+      source_ref: System.get_env("EXDOC_SOURCE_REF") || "main",
+      main: "readme",
+      extras: ~w(README.md),
+      formatters: ["html"],
+      javascript_config_path: "../.doc-versions.js"
+    ]
+  end
+
   defp deps do
     [
       {:ex_doc, "~> 0.27", only: :dev, runtime: false},
