@@ -14,7 +14,7 @@ defmodule Delta.Validators do
         {:error, struct(err, expected: "UUIDv4", got: "UUIDv#{v}")}
 
       {:error, "Invalid argument; Expected: String"} ->
-        {:error, struct(err, expected: "UUID", got: "#{inspect(uuid)}")}
+        {:error, struct(err, expected: "UUID", got: uuid)}
 
       {:error, e} ->
         {:error, struct(err, expected: "UUID", got: e)}
@@ -49,11 +49,12 @@ defmodule Delta.Validators do
   def json_patch_op(operation, err),
     do: {:error, struct(err, expected: "valid operation", got: operation)}
 
+  @spec json_pointer(Delta.Json.Pointer.t() | any(), Validation.t()) :: :ok | {:error, Validation.t()}
   def json_pointer(pointer, err \\ %Validation{}) do
     if Enum.all?(pointer, &(is_bitstring(&1) or is_integer(&1))) do
       :ok
     else
-      struct(err, expected: "JsonPointer to be list of strings or integers", got: pointer)
+      {:error, struct(err, expected: "JsonPointer to be list of strings or integers", got: pointer)}
     end
   end
 
