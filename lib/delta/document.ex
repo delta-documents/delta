@@ -3,6 +3,9 @@ defmodule Delta.Document do
   Internal documents API
   """
 
+  alias Delta.Validators
+  alias Delta.Errors.Validation
+
   @type t() :: %__MODULE__{
           id: Delta.uuid4(),
           collection: String.t(),
@@ -19,8 +22,14 @@ defmodule Delta.Document do
   @doc """
   Validates `document.id` to be UUIDv4 in default form
   """
-  @spec validate(t()) :: {:atomic, t()} | {:aborted, Delta.Errors.Validation.t()}
-  def validate(document), do: nil
+  @spec validate(t()) :: {:ok, t()} | {:error, Validation.t()}
+  def validate(%__MODULE__{id: id} = d) do
+    with :ok <- Validators.uuid4(id), do: {:ok, d}
+  end
+
+  def validate(x) do
+    {:error, %Validation{struct: __MODULE__, expected: "Value to be %#{__MODULE__}{}", got: x}}
+  end
 
   @doc """
   Returns ids of all documents for efficiency reasons
