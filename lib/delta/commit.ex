@@ -134,8 +134,9 @@ defmodule Delta.Commit do
     end
   end
 
-  def validate(x),
-    do: %Validation{struct: __MODULE__, expected: "Value to be %#{__MODULE__}{}", got: x}
+  def validate(x) do
+    {:error, %Validation{struct: __MODULE__, expected: "Value to be %#{__MODULE__}{}", got: x}}
+  end
 
   @doc """
   Validates commits according to the following rules:
@@ -146,10 +147,11 @@ defmodule Delta.Commit do
   """
   @spec validate_many([t() | any()]) :: {:ok, [t()]} | {:error, Validation.t()}
   def validate_many(commits) do
-    x = Enum.reduce(commits, fn
-      %__MODULE__{previous_commit_id: id} = c, {:ok, %__MODULE__{id: id}} -> validate(c)
-      _, {:error, c} -> {:error, c}
-    end)
+    x =
+      Enum.reduce(commits, fn
+        %__MODULE__{previous_commit_id: id} = c, {:ok, %__MODULE__{id: id}} -> validate(c)
+        _, {:error, c} -> {:error, c}
+      end)
 
     with {:ok, _} <- x, do: {:ok, commits}
   end
