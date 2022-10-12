@@ -4,17 +4,17 @@ defmodule Delta.Errors do
   """
 
   defmodule DoesNotExist do
-    @type t() :: %__MODULE__{struct: module(), id: Delta.uuid4(), message: String.t()}
+    @type t() :: %__MODULE__{struct: module() | nil, id: Delta.uuid4(), message: String.t() | nil}
     defstruct([:struct, :id, :message])
   end
 
   defmodule AlreadyExist do
-    @type t() :: %__MODULE__{struct: module(), id: Delta.uuid4(), message: String.t()}
+    @type t() :: %__MODULE__{struct: module() | nil, id: Delta.uuid4(), message: String.t() | nil}
     defstruct([:struct, :id, :message])
   end
 
   defmodule Validation do
-    @type t() :: %__MODULE__{struct: module(), field: atom(), got: any(), message: String.t()}
+    @type t() :: %__MODULE__{struct: module() | nil, field: atom() | nil, got: any() | nil, message: String.t() | nil}
     defstruct([:struct, :field, :expected, :got, :message])
   end
 
