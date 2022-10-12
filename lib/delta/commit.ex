@@ -21,24 +21,25 @@ defmodule Delta.Commit do
 
   ## Autosquashing
   Autosquashing is delta's feature for continious and frequent document updates. It reduces the number of commits by squashing (see `Delta.Commit.squash/2`).
-  In order for two commits to be autosquashed, they must be marked `autosquash?: true` and have `delta` with same paths.
   If there will be a commit with `autosquahs?: false` and its delta will have any path which is being autosquahed at the moment, the commit will not be squashed.
+  In order for two commits to be autosquashed, they must be marked `autosquash?: true` and have `delta` with same paths.
   For autosquash commit no checks of `previous_commit_id` are performed.
   """
 
   alias Delta.DataLayer
+  alias Delta.Validators
   alias Delta.Errors.{Validation, DoesNotExist, AlreadyExist, Conflict}
 
   @type t() :: %__MODULE__{
           id: Delta.uuid4(),
-          previous_commit_id: Delta.uuid4(),
+          previous_commit_id: Delta.uuid4() | nil,
           document_id: Delta.uuid4(),
-          order: non_neg_integer,
-          autosquash?: boolean,
+          order: non_neg_integer | nil,
+          autosquash?: boolean | nil,
           delta: Delta.Json.Patch.t(),
-          reverse_delta: Delta.Json.Patch.t(),
+          reverse_delta: Delta.Json.Patch.t() | nil,
           meta: any,
-          updated_at: DateTime.t()
+          updated_at: DateTime.t() | nil
         }
 
   @type id() :: Delta.uuid4() | t()
@@ -110,7 +111,31 @@ defmodule Delta.Commit do
   Note: other functions exptect valid input, therefor before passing data to them it should be validated.
   """
   @spec validate(t() | any()) :: {:ok, t()} | {:error, Validation.t()}
-  def validate(commit), do: nil
+  def validate(
+        %__MODULE__{
+          id: id,
+          previous_commit_id: previous_commit_id,
+          document_id: document_id,
+          delta: delta
+        } = c
+      ) do
+    with :ok <-
+           Validators.uuid4(id, %Validation{struct: __MODULE__, field: :id}),
+         :ok <-
+           Validators.maybe_uuid4(
+             previous_commit_id,
+             %Validation{struct: __MODULE__, field: :previous_commit_id}
+           ),
+         :ok <-
+           Validators.uuid4(document_id, %Validation{struct: __MODULE__, field: :document_id}),
+         :ok <-
+           Validators.json_patch(delta, %Validation{struct: __MODULE__, field: :delta}) do
+      {:ok, c}
+    end
+  end
+
+  def validate(x),
+    do: %Validation{struct: __MODULE__, expected: "Value to be %#{__MODULE__}{}", got: x}
 
   @doc """
   Validates commits according to the following rules:
@@ -119,11 +144,18 @@ defmodule Delta.Commit do
   - All commits must have same `:document_id`
   - Each commit must be valid (See `validate/1`)
   """
-  @spec validate_many([t() | any]) :: {:ok, [t()]} | {:error, Validation.t()}
-  def validate_many(commits), do: nil
+  @spec validate_many([t() | any()]) :: {:ok, [t()]} | {:error, Validation.t()}
+  def validate_many(commits) do
+    x = Enum.reduce(commits, fn
+      %__MODULE__{previous_commit_id: id} = c, {:ok, %__MODULE__{id: id}} -> validate(c)
+      _, {:error, c} -> {:error, c}
+    end)
+
+    with {:ok, _} <- x, do: {:ok, commits}
+  end
 
   @doc """
-  Lists commits of `Delta.Documnent` with `id = document_id`.
+  Lists commits of `Delta.Document` with `id = document_id`.
 
   Expensive operation.
   If document does not exists, returns empty list
@@ -194,11 +226,15 @@ defmodule Delta.Commit do
   Commits must be sorted by theirs (would be) ascending order – first commit is the first element of the list.
   History must be sorted by descnding order – last commit is the first element of the list.
   """
-  @spec resolve_conflicts(commtis :: [t()], history :: [t()]) :: {:ok, [t()]} | {:error, Conflict.t()}
+  @spec resolve_conflicts(commtis :: [t()], history :: [t()]) ::
+          {:ok, [t()]} | {:error, Conflict.t()}
   def resolve_conflicts([], _), do: {:ok, []}
   def resolve_conflicts(commits, []), do: {:ok, commits}
-  def resolve_conflicts([%__MODULE__{previous_commit_id: id} | _] = commits, [%__MODULE__{id: id} | _]),
-    do: {:ok, commits}
+
+  def resolve_conflicts([%__MODULE__{previous_commit_id: id} | _] = commits, [
+        %__MODULE__{id: id} | _
+      ]),
+      do: {:ok, commits}
 
   def resolve_conflicts(
         [%__MODULE__{id: id1, delta: d1} = first | rest],
