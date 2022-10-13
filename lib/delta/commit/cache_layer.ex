@@ -313,8 +313,8 @@ defmodule Delta.Commit.CacheLayer do
                :previous_commit_id,
                :document_id,
                :autosquash?,
-               :delta,
-               :reverse_delta,
+               :patch,
+               :reverse_patch,
                :meta,
                :updated_at
              ],
@@ -414,8 +414,8 @@ defmodule Delta.Commit.CacheLayer do
       document_id: document_id,
       order: order,
       autosquash?: autosquash?,
-      delta: delta,
-      reverse_delta: reverse_delta,
+      patch: delta,
+      reverse_patch: reverse_delta,
       meta: meta,
       updated_at: updated_at
     }
@@ -427,8 +427,8 @@ defmodule Delta.Commit.CacheLayer do
          document_id: document_id,
          order: order,
          autosquash?: autosquash?,
-         delta: delta,
-         reverse_delta: reverse_delta,
+         patch: delta,
+         reverse_patch: reverse_delta,
          meta: meta,
          updated_at: updated_at
        }) do

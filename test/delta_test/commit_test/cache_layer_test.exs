@@ -19,8 +19,8 @@ defmodule DeltaTest.CommitTest.CacheLayerTest do
     document_id: 1,
     order: 0,
     autosquash?: false,
-    delta: [],
-    reverse_delta: nil,
+    patch: [],
+    reverse_patch: nil,
     meta: nil
   }
 
@@ -53,8 +53,8 @@ defmodule DeltaTest.CommitTest.CacheLayerTest do
       document_id: 1,
       order: 0,
       autosquash?: false,
-      delta: [],
-      reverse_delta: nil,
+      patch: [],
+      reverse_patch: nil,
       meta: nil
     }
 
@@ -63,7 +63,7 @@ defmodule DeltaTest.CommitTest.CacheLayerTest do
         :atomic,
         [
           struct(@commit, id: 2, order: 1),
-          struct(@commit, delta: [:a])
+          struct(@commit, patch: [:a])
         ],
         nil
       }
@@ -74,7 +74,7 @@ defmodule DeltaTest.CommitTest.CacheLayerTest do
         :atomic,
         [
           struct(@commit, id: 2, order: 1),
-          struct(@commit, delta: [:a])
+          struct(@commit, patch: [:a])
         ],
         nil
       }
@@ -110,9 +110,9 @@ defmodule DeltaTest.CommitTest.CacheLayerTest do
     assert {:atomic, _, _} = CacheLayer.write(@layer_id, @commit, false)
 
     assert {:atomic, [%Commit{id: 1}], c} = CacheLayer.list(@layer_id, true)
-    assert {:atomic, [%Commit{id: 1, delta: []}], _} = continue(@test_layer_id, c)
+    assert {:atomic, [%Commit{id: 1, patch: []}], _} = continue(@test_layer_id, c)
 
-    assert {:atomic, [%Commit{id: 2}, %Commit{id: 1, delta: []}], _} =
+    assert {:atomic, [%Commit{id: 2}, %Commit{id: 1, patch: []}], _} =
              continue(@test2_layer_id, c)
   end
 
