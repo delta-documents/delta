@@ -106,6 +106,7 @@ defmodule Delta.Json.Patch do
   @doc """
   Returns true if two patches have operations on overlapping paths
   """
+  @spec overlap?(t(), t()) :: boolean()
   def overlap?(patch1, patch2) do
     for p1 <- patch1, p2 <- patch2 do
       if Delta.Json.Pointer.overlap?(elem(p1, 1), elem(p2, 1)), do: throw(true)
