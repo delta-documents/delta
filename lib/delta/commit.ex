@@ -307,6 +307,41 @@ defmodule Delta.Commit do
   end
 
   @doc """
+  Squashing implementation. See `squash/2`.
+  """
+  @spec do_squash(t(), t()) :: t()
+  def do_squash(
+        %__MODULE__{
+          id: id,
+          previous_commit_id: previous_commit_id,
+          document_id: document_id,
+          order: order,
+          patch: patch1,
+          reverse_patch: reverse_patch1
+        },
+        %__MODULE__{
+          document_id: document_id,
+          autosquash?: autosquash?,
+          patch: patch2,
+          reverse_patch: reverse_patch2,
+          meta: meta,
+          updated_at: updated_at
+        }
+      ) do
+    %__MODULE__{
+      id: id,
+      previous_commit_id: previous_commit_id,
+      document_id: document_id,
+      order: order,
+      autosquash?: autosquash?,
+      patch: Delta.Json.Patch.squash(patch1, patch2),
+      reverse_patch: Delta.Json.Patch.squash(reverse_patch2, reverse_patch1),
+      meta: meta,
+      updated_at: updated_at
+    }
+  end
+
+  @doc """
   Checks if two commits overlap
 
   Commits are overlapping if their patches overlap

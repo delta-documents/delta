@@ -99,4 +99,46 @@ defmodule DeltaTest.CommitTest do
                ]
              )
   end
+
+  test "Delta.Commit.do_squash/2 correctly joins two commits" do
+    doc_id = UUID.uuid4()
+    id1 = UUID.uuid4()
+    id2 = UUID.uuid4()
+
+    c1 = %Commit{
+      id: 0,
+      previous_commit_id: nil,
+      document_id: :doc_id,
+      order: 0,
+      autosquash?: false,
+      patch: [{:add, ["a"], 0}],
+      reverse_patch: [{:delete, ["a"]}],
+      updated_at: 0,
+      meta: 0
+    }
+
+    c2 = %Commit{
+      id: 1,
+      document_id: :doc_id,
+      previous_commit_id: nil,
+      order: 1,
+      autosquash?: true,
+      patch: [{:add, ["b"], 1}],
+      reverse_patch: [{:delete, ["b"]}],
+      updated_at: 1,
+      meta: 1
+    }
+
+    assert %Commit{
+             id: 0,
+             previous_commit_id: nil,
+             document_id: :doc_id,
+             order: 0,
+             autosquash?: true,
+             patch: [{:add, ["a"], 0}, {:add, ["b"], 1}],
+             reverse_patch: [delete: ["b"], delete: ["a"]],
+             meta: 1,
+             updated_at: 1
+           } = do_squash(c1, c2)
+  end
 end
