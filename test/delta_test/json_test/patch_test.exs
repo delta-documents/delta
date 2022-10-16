@@ -83,4 +83,8 @@ defmodule DeltaTest.JsonTest.PatchTest do
     assert Patch.overlap?([{:remove, [:a]}], [{:remove, [:a]}, {:remove, [:b]}])
     assert !Patch.overlap?([{:remove, [:a]}], [{:remove, [:b]}])
   end
+
+  test "Delta.Json.Patch.paths/1" do
+    assert [[:a], [:b], [:c], [:e]] == Patch.paths([{:add, [:a], 0}, {:remove, [:b]}, {:move, [:c], [:d]}, {:copy, [:e], [:f]}])
+  end
 end

@@ -117,6 +117,9 @@ defmodule Delta.Json.Patch do
     x -> x
   end
 
+  @spec paths(t()) :: list(Delta.Json.Pointer.t())
+  def paths(patch), do: Enum.map(patch, &(elem(&1, 1)))
+
   defp parse_path({:remove, path}) do
     with {:ok, path} <- Delta.Json.Pointer.parse(path) do
       {:remove, path}
