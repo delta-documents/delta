@@ -7,7 +7,7 @@ defmodule Delta.Json.Patch do
     - test operation is ignored
     - replace and add considered to be the same operations
 
-  This is due to optimisation reasons.
+  This is due to optimization reasons.
   """
 
   @typedoc """

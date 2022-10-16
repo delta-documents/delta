@@ -40,7 +40,7 @@ defmodule Delta.Commit.CacheLayer do
 
   @impl DataLayer
   @doc """
-  Returns anonyumous function /0, which deletes mnesia table used by the layer.
+  Returns anonymous function /0, which deletes mnesia table used by the layer.
   """
   def crash_handler(%{table: t}) do
     fn ->
@@ -132,7 +132,7 @@ defmodule Delta.Commit.CacheLayer do
   @doc """
   Gets commit.
 
-  If it exists, continuation is alwayus `nil`
+  If it exists, continuation is always `nil`
 
   See `Delta.Commit.get/1`
   """
@@ -163,7 +163,7 @@ defmodule Delta.Commit.CacheLayer do
   @doc """
   Writes commit.
 
-  Continuation wirtes commit on another data layer.
+  Continuation writes commit on another data layer.
 
   See `Delta.Commit.write/1`
   """
@@ -215,7 +215,7 @@ defmodule Delta.Commit.CacheLayer do
 
   @impl Commit
   @doc """
-  Deletes commit. Always successful. Continuation deletes commit on antother data layer.
+  Deletes commit. Always successful. Continuation deletes commit on another data layer.
 
   See `Delta.Commit.delete/1`
   """

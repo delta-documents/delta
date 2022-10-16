@@ -24,7 +24,7 @@ defmodule Delta.Commit do
     - `:updated_at` – when the commit was updated.
 
   ## Autosquashing
-  Autosquashing is delta's feature for continious and frequent document updates. It reduces the number of commits by squashing (see `Delta.Commit.squash/2`).
+  Autosquashing is delta's feature for continuous and frequent document updates. It reduces the number of commits by squashing (see `Delta.Commit.squash/2`).
   If there will be a commit with `autosquahs?: false` and its delta will have any path which is being autosquahed at the moment, the commit will not be squashed.
   In order for two commits to be autosquashed, they must be marked `autosquash?: true` and have `delta` with same paths.
   For autosquash commit no checks of `previous_commit_id` are performed.
@@ -107,7 +107,7 @@ defmodule Delta.Commit do
   - `:patch` – must be valid RFC 6092 Json delta
   - `:document_id` – must be valid UUIDv4 of document in default form.
 
-  Note: other functions exptect valid input, therefor before passing data to them it should be validated.
+  Note: other functions expect valid input, therefor before passing data to them it should be validated.
   """
 
   @spec validate(t() | any()) :: {:ok, t()} | {:error, Validation.t()}
@@ -283,7 +283,7 @@ defmodule Delta.Commit do
   Checks if commits have conflict(s) with history and resolves them if possible.
 
   Commits must be sorted by theirs (would be) ascending order – first commit is the first element of the list.
-  History must be sorted by descnding order – last commit is the first element of the list.
+  History must be sorted by descending order – last commit is the first element of the list.
   """
   @spec resolve_conflicts(commits :: [t()], history :: [t()]) ::
           {:ok, [t()]} | {:error, Conflict.t()}
