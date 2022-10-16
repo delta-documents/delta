@@ -5,6 +5,10 @@ defmodule Delta.Commit do
   An interface to work on top of `Delta.DataLayer` which should also implement `Delta.Commit`
   """
 
+  alias Delta.DataLayer
+  alias Delta.Validators
+  alias Delta.Errors.{Validation, DoesNotExist, AlreadyExist, Conflict}
+
   @typedoc """
   Represents a commit made by user to a document.
 
@@ -25,11 +29,6 @@ defmodule Delta.Commit do
   In order for two commits to be autosquashed, they must be marked `autosquash?: true` and have `delta` with same paths.
   For autosquash commit no checks of `previous_commit_id` are performed.
   """
-
-  alias Delta.DataLayer
-  alias Delta.Validators
-  alias Delta.Errors.{Validation, DoesNotExist, AlreadyExist, Conflict}
-
   @type t() :: %__MODULE__{
           id: Delta.uuid4(),
           previous_commit_id: Delta.uuid4() | nil,
@@ -110,6 +109,7 @@ defmodule Delta.Commit do
 
   Note: other functions exptect valid input, therefor before passing data to them it should be validated.
   """
+
   @spec validate(t() | any()) :: {:ok, t()} | {:error, Validation.t()}
   def validate(
         %__MODULE__{
@@ -129,7 +129,8 @@ defmodule Delta.Commit do
          :ok <-
            Validators.uuid4(document_id, %Validation{struct: __MODULE__, field: :document_id}),
          :ok <-
-           Validators.json_patch(delta, %Validation{struct: __MODULE__, field: :patch}) do
+           Validators.json_patch(delta, %Validation{struct: __MODULE__, field: :patch}),
+         :ok <- cyclic_reference(c) do
       {:ok, c}
     end
   end
@@ -137,6 +138,20 @@ defmodule Delta.Commit do
   def validate(x) do
     {:error, %Validation{struct: __MODULE__, expected: "Value to be %#{__MODULE__}{}", got: x}}
   end
+
+  defp cyclic_reference(%__MODULE__{id: id, previous_commit_id: id}) do
+    {
+      :error,
+      %Validation{
+        struct: __MODULE__,
+        field: :previous_commit_id,
+        got: "cyclic reference",
+        expected: ":id to be not equal to :previous_commit_id"
+      }
+    }
+  end
+
+  defp cyclic_reference(_), do: :ok
 
   @doc """
   Validates commits according to the following rules:
@@ -146,14 +161,56 @@ defmodule Delta.Commit do
   - Each commit must be valid (See `validate/1`)
   """
   @spec validate_many([t() | any()]) :: {:ok, [t()]} | {:error, Validation.t()}
-  def validate_many(commits) do
-    x =
-      Enum.reduce(commits, fn
-        %__MODULE__{previous_commit_id: id} = c, {:ok, %__MODULE__{id: id}} -> validate(c)
-        _, {:error, c} -> {:error, c}
+  def validate_many([]), do: {:ok, []}
+
+  def validate_many([first | commits]) do
+    order =
+      Enum.reduce(commits, validate(first), fn
+        %__MODULE__{previous_commit_id: id, document_id: d} = c,
+        {:ok, %__MODULE__{id: id, document_id: d}} ->
+          validate(c)
+
+        %__MODULE__{document_id: d}, {:ok, %__MODULE__{document_id: d}} ->
+          {
+            :error,
+            %Validation{
+              struct: __MODULE__,
+              field: :previous_commit_id,
+              expected: "list of commits ordered from old to new"
+            }
+          }
+
+        %__MODULE__{document_id: d}, {:ok, %__MODULE__{}} ->
+          {
+            :error,
+            %Validation{
+              struct: __MODULE__,
+              field: :document_id,
+              expected: ":document_id to be same for all commits",
+              got: d
+            }
+          }
+
+        _, {:error, _} = e ->
+          e
       end)
 
-    with {:ok, _} <- x, do: {:ok, commits}
+    first_previous =
+      if Enum.all?(commits, &(&1.id != first.previous_commit_id)),
+        do: :ok,
+        else: {
+          :error,
+          %Validation{
+            struct: __MODULE__,
+            field: :previous_commit_id,
+            expected: "first commit not to be the next commit of any in list"
+          }
+        }
+
+    with {:ok, _} <- order,
+         :ok <- first_previous do
+      {:ok, [first | commits]}
+    end
   end
 
   @doc """
