@@ -140,4 +140,60 @@ defmodule Delta.Commit.PersistentLayer do
   @impl GenServer
   def handle_cast({:add_continuation, continuation}, %{continuations: cs} = state),
     do: {:noreply, struct(state, continuations: [continuation | cs])}
+
+  def from_mongo(%{
+        "_id" => id,
+        "previous_commit_id" => previous_commit_id,
+        "document_id" => document_id,
+        "order" => order,
+        "autosquash?" => autosquash?,
+        "patch" => patch,
+        "reverse_patch" => reverse_patch,
+        "meta" => meta,
+        "updated_at" => updated_at
+      }) do
+    %Commit{
+      id: id,
+      previous_commit_id: previous_commit_id,
+      document_id: document_id,
+      order: order,
+      autosquash?: autosquash?,
+      patch: patch_from_mongo(patch),
+      reverse_patch: patch_from_mongo(reverse_patch),
+      meta: meta,
+      updated_at: updated_at
+    }
+  end
+
+  def to_mongo(%Commit{
+        id: id,
+        previous_commit_id: previous_commit_id,
+        document_id: document_id,
+        order: order,
+        autosquash?: autosquash?,
+        patch: patch,
+        reverse_patch: reverse_patch,
+        meta: meta,
+        updated_at: updated_at
+      }) do
+    %{
+      _id: id,
+      previous_commit_id: previous_commit_id,
+      document_id: document_id,
+      order: order,
+      autosquash?: autosquash?,
+      patch: patch_to_mongo(patch),
+      reverse_patch: patch_to_mongo(reverse_patch),
+      meta: meta,
+      updated_at: updated_at
+    }
+  end
+
+  defp patch_to_mongo(nil), do: nil
+  defp patch_to_mongo(patch), do: Enum.map(patch, &Tuple.to_list/1)
+
+  defp patch_from_mongo(nil), do: nil
+
+  defp patch_from_mongo(patch),
+    do: Enum.map(patch, &List.to_tuple([String.to_existing_atom(hd(&1)) | tl(&1)]))
 end
